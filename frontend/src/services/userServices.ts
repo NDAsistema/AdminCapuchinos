@@ -60,11 +60,8 @@ class UserService {
      */
     async getAllUser(): Promise<User[]> {
         try {
-            const response = await api.get('/users/getAllUser');
-            if (response.data.success && Array.isArray(response.data.data)) {
-                return response.data.data;
-            }
-            return [];
+            const response = await api.get('/user/getAllUser');
+            return response.data;
         } catch (error: any) {
             console.error('❌ Error en getAllUser:', error.message);
             return [];
@@ -76,7 +73,7 @@ class UserService {
      */
     async createUser(userData: CreateUserData): Promise<User | null> {
         try {
-            const response = await api.post('/users/create', userData);
+            const response = await api.post('/user/create', userData);
             return response.data.data;
         } catch (error: any) {
             console.error('❌ Error creando usuario:', {
@@ -92,7 +89,7 @@ class UserService {
      */
     async updateUser(id: number, userData: Partial<CreateUserData>): Promise<User | null> {
         try {
-            const response = await api.put(`/users/update/${id}`, userData);
+            const response = await api.put(`/user/update/${id}`, userData);
             return response.data.data;
         } catch (error: any) {
             console.error('❌ Error actualizando usuario:', error.message);
@@ -105,7 +102,7 @@ class UserService {
      */
     async deleteUser(id: number): Promise<boolean> {
         try {
-            const response = await api.delete(`/users/delete/${id}`);
+            const response = await api.delete(`/user/delete/${id}`);
             return response.data.success;
         } catch (error: any) {
             console.error('❌ Error eliminando usuario:', error.message);
@@ -118,8 +115,34 @@ class UserService {
      */
     async getUserById(id: number): Promise<User | null> {
         try {
-            const response = await api.get(`/users/${id}`);
+            const response = await api.get(`/user/${id}`);
             return response.data.data;
+        } catch (error: any) {
+            console.error('❌ Error obteniendo usuario por ID:', error.message);
+            return null;
+        }
+    }
+
+    /**
+     * Obtiene un usuario específico por su ID
+     */
+    async listBrotherByCreate(): Promise<User | null> {
+        try {
+            const response = await api.get(`/brother/searchListBrotherByCreateUsers`);
+            return response.data.data;
+        } catch (error: any) {
+            console.error('❌ Error obteniendo usuario por ID:', error.message);
+            return null;
+        }
+    }
+
+    /**
+     * Obtiene Listado de tipos de Usuarios 
+     */
+    async listTypeUsers(): Promise<User | null> {
+        try {
+            const response = await api.get(`/user/searchListTypeUsers`);
+            return response.data;
         } catch (error: any) {
             console.error('❌ Error obteniendo usuario por ID:', error.message);
             return null;

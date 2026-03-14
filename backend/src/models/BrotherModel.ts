@@ -141,4 +141,11 @@ export class BrotherModel {
     const [rows] = await pool.execute('SELECT * FROM type_user_services') as any;
     return rows;
   }
+
+  // buscar hermanos para crear usuarios 
+  static async searchListBrotherByCreateUsers(): Promise<Brother[]> {
+    const [rows] = await pool.execute('SELECT b.id, b.name, b.email, b.server, tus.name as nameserver FROM brothers as b LEFT JOIN users as u ON (u.id_brother != b.id) LEFT JOIN type_user_services as tus ON (tus.id = b.server) WHERE b.status = 1 GROUP BY b.id, b.name, b.email, b.server, tus.name ORDER BY b.name') as any;
+    return rows;
+  }
+  
 }

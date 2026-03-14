@@ -335,4 +335,25 @@ export class BrotherController {
             });
         }
     }
+
+    /**
+     * Buscar listado de hermanos para crear usuariso 
+     */
+
+    static async searchListBrotherByCreateUsers(req: Request, res: Response) {
+        try {
+            const brothers = await BrotherModel.searchListBrotherByCreateUsers();
+            res.json({
+                success: true,
+                data: brothers
+            });
+        }catch (error) {
+            console.error('Error getting brothers for create user:', error);
+            res.status(500).json({
+                success: false,
+                message: 'Error interno del servidor'
+            });
+        }
+    }
+    
 }
