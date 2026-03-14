@@ -1,7 +1,7 @@
-// src/services/userService.ts
 import axios from 'axios';
 
 const api = axios.create({
+  // Asegúrate de que esta URL sea la correcta (http://localhost:5001/api)
   baseURL: import.meta.env.VITE_API_URL || 'http://localhost:5001/api',
   timeout: 10000,
 });
@@ -15,116 +15,125 @@ api.interceptors.request.use(
     }
     return config;
   },
-  (error) => {
-    return Promise.reject(error);
-  }
+  (error) => Promise.reject(error)
 );
 
-// Interceptor para manejar errores de respuesta globalmente
-api.interceptors.response.use(
-  (response) => response,
-  (error) => {
-    if (error.response?.status === 401) {
-      console.error('🔐 Error 401: No autorizado - Sesión expirada');
-    }
-    if (error.response?.status === 403) {
-      console.error('🚫 Error 403: Acceso prohibido');
-    }
-    return Promise.reject(error);
-  }
-);
-
-// Interfaces para tipar los datos de Usuario
-export interface User {
+// Interfaces para tipar las Fraternidades (Home)
+export interface Home {
     id: number;
-    type_user: string;
-    email: string;
-    password?: string;
-    id_brother?: number;
-    name?: string; // Nombre del hermano (traído por el JOIN)
-    img?: string;  // Imagen del hermano (traída por el JOIN)
+    name_home: string;
+    address_home?: string;
+    phone_home?: string;
     status: number;
+    created_at?: string;
 }
 
-export interface CreateUserData {
-    email: string;
-    password?: string;
-    type_user: string;
-    id_brother?: number | string;
+export interface CreateHomeData {
+    name_home: string;
+    address_home?: string;
+    phone_home?: string;
 }
 
-class UserService {
+class HomeService {
     
     /**
-     * Obtiene todos los usuarios activos del sistema
+     * GET /api/home
+     * Obtiene todas las fraternidades
      */
-    async getAllUser(): Promise<User[]> {
+    async getAllHomes(): Promise<Home[]> {
         try {
-            const response = await api.get('/users/all');
-            if (response.data.success && Array.isArray(response.data.data)) {
+            const response = await api.get('/home'); // Ruta ajustada a tu app.ts
+            // Ajustamos según si tu controller devuelve { success, data } o solo el array
+            if (response.data.success) {
                 return response.data.data;
             }
-            return [];
+            return Array.isArray(response.data) ? response.data : [];
         } catch (error: any) {
-            console.error('❌ Error en getAllUser:', error.message);
+            console.error('❌ Error en getAllHome:', error.message);
             return [];
         }
     }
 
     /**
-     * Crea un nuevo usuario para el login
+     * POST /api/home
+     * Crea una nueva fraternidad
      */
-    async createUser(userData: CreateUserData): Promise<User | null> {
+    async createHome(homeData: CreateHomeData): Promise<any> {
         try {
-            const response = await api.post('/users/create', userData);
-            return response.data.data;
+            const response = await api.post('/home', homeData);
+            return response.data;
         } catch (error: any) {
-            console.error('❌ Error creando usuario:', {
-                message: error.message,
-                response: error.response?.data
-            });
+            console.error('❌ Error creando home:', error.response?.data || error.message);
             throw error;
         }
     }
 
     /**
-     * Actualiza los datos de un usuario existente
+     * GET /api/home/:id
      */
-    async updateUser(id: number, userData: Partial<CreateUserData>): Promise<User | null> {
+    async getHomeById(id: number): Promise<Home | null> {
         try {
-            const response = await api.put(`/users/update/${id}`, userData);
-            return response.data.data;
+            const response = await api.get(`/home/${id}`);
+            return response.data.success ? response.data.data : response.data;
         } catch (error: any) {
-            console.error('❌ Error actualizando usuario:', error.message);
+            console.error('❌ Error obteniendo home:', error.message);
+            return null;
+        }
+    }
+
+    /**
+     * PUT /api/home/:id
+     */
+    async updateHome(id: number, homeData: Partial<CreateHomeData>): Promise<any> {
+        try {
+            const response = await api.put(`/home/${id}`, homeData);
+            return response.data;
+        } catch (error: any) {
+            console.error('❌ Error actualizando home:', error.message);
             throw error;
         }
     }
 
     /**
-     * Eliminación lógica (Analógica) de un usuario
+     * DELETE /api/home/:id
      */
-    async deleteUser(id: number): Promise<boolean> {
+    async deleteHome(id: number): Promise<boolean> {
         try {
-            const response = await api.delete(`/users/delete/${id}`);
+            const response = await api.delete(`/home/${id}`);
             return response.data.success;
         } catch (error: any) {
-            console.error('❌ Error eliminando usuario:', error.message);
+            console.error('❌ Error eliminando home:', error.message);
             return false;
         }
     }
 
+    // --- RUTAS ESPECÍFICAS DE IMÁGENES ---
+
     /**
-     * Obtiene un usuario específico por su ID
+     * GET /api/home/getAllImgById/:id
      */
-    async getUserById(id: number): Promise<User | null> {
+    async getImagesByHomeId(id: number): Promise<any[]> {
         try {
-            const response = await api.get(`/users/${id}`);
-            return response.data.data;
+            const response = await api.get(`/home/getAllImgById/${id}`);
+            return response.data.success ? response.data.data : [];
         } catch (error: any) {
-            console.error('❌ Error obteniendo usuario por ID:', error.message);
-            return null;
+            console.error('❌ Error obteniendo imágenes:', error.message);
+            return [];
+        }
+    }
+
+    /**
+     * DELETE /api/home/deleteImgHome/:id
+     */
+    async deleteImageHome(id: number): Promise<boolean> {
+        try {
+            const response = await api.delete(`/home/deleteImgHome/${id}`);
+            return response.data.success;
+        } catch (error: any) {
+            console.error('❌ Error eliminando imagen:', error.message);
+            return false;
         }
     }
 }
 
-export default new UserService();
+export default new HomeService();
