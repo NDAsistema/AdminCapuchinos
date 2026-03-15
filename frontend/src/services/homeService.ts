@@ -1,12 +1,11 @@
 import axios from 'axios';
 
 const api = axios.create({
-  // Asegúrate de que esta URL sea la correcta (http://localhost:5001/api)
   baseURL: import.meta.env.VITE_API_URL || 'http://localhost:5001/api',
   timeout: 10000,
 });
 
-// Interceptor para inyectar el token en cada petición
+// Interceptor para inyectar el token
 api.interceptors.request.use(
   (config) => {
     const token = localStorage.getItem('token');
@@ -18,47 +17,44 @@ api.interceptors.request.use(
   (error) => Promise.reject(error)
 );
 
-// Interfaces para tipar las Fraternidades (Home)
+// CORRECCIÓN CLAVE: Interceptor de respuesta para manejar errores de token
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error.response?.status === 401) {
+      console.error('🔐 Token inválido o sesión expirada. Limpiando...');
+      // Si el backend rechaza el token, lo borramos para evitar bucles de error
+      localStorage.removeItem('token');
+      localStorage.removeItem('user');
+      // Opcional: Redirigir al login
+      // window.location.href = '/signin';
+    }
+    return Promise.reject(error);
+  }
+);
+
 export interface Home {
     id: number;
-    name_home: string;
-    address_home?: string;
-    phone_home?: string;
+    name: string; // Asegúrate de que coincida con el nombre en la BD (name o name_home)
+    guardian?: number;
+    location?: string;
     status: number;
-    created_at?: string;
-}
-
-export interface CreateHomeData {
-    name_home: string;
-    address_home?: string;
-    phone_home?: string;
 }
 
 class HomeService {
     
-    /**
-     * GET /api/home
-     * Obtiene todas las fraternidades
-     */
     async getAllHomes(): Promise<Home[]> {
         try {
-            const response = await api.get('/home'); // Ruta ajustada a tu app.ts
-            // Ajustamos según si tu controller devuelve { success, data } o solo el array
-            if (response.data.success) {
-                return response.data.data;
-            }
-            return Array.isArray(response.data) ? response.data : [];
+            const response = await api.get('/home');
+            // Retornamos la data limpia
+            return response.data.success ? response.data.data : response.data;
         } catch (error: any) {
             console.error('❌ Error en getAllHome:', error.message);
             return [];
         }
     }
 
-    /**
-     * POST /api/home
-     * Crea una nueva fraternidad
-     */
-    async createHome(homeData: CreateHomeData): Promise<any> {
+    async createHome(homeData: any): Promise<any> {
         try {
             const response = await api.post('/home', homeData);
             return response.data;
@@ -68,9 +64,6 @@ class HomeService {
         }
     }
 
-    /**
-     * GET /api/home/:id
-     */
     async getHomeById(id: number): Promise<Home | null> {
         try {
             const response = await api.get(`/home/${id}`);
@@ -81,10 +74,7 @@ class HomeService {
         }
     }
 
-    /**
-     * PUT /api/home/:id
-     */
-    async updateHome(id: number, homeData: Partial<CreateHomeData>): Promise<any> {
+    async updateHome(id: number, homeData: any): Promise<any> {
         try {
             const response = await api.put(`/home/${id}`, homeData);
             return response.data;
@@ -94,9 +84,6 @@ class HomeService {
         }
     }
 
-    /**
-     * DELETE /api/home/:id
-     */
     async deleteHome(id: number): Promise<boolean> {
         try {
             const response = await api.delete(`/home/${id}`);
@@ -107,11 +94,8 @@ class HomeService {
         }
     }
 
-    // --- RUTAS ESPECÍFICAS DE IMÁGENES ---
+    // --- IMÁGENES ---
 
-    /**
-     * GET /api/home/getAllImgById/:id
-     */
     async getImagesByHomeId(id: number): Promise<any[]> {
         try {
             const response = await api.get(`/home/getAllImgById/${id}`);
@@ -122,9 +106,23 @@ class HomeService {
         }
     }
 
-    /**
-     * DELETE /api/home/deleteImgHome/:id
-     */
+    async uploadHomeImage(homeId: number, file: File, order: number): Promise<any> {
+        try {
+            const formData = new FormData();
+            formData.append('img', file);
+            formData.append('home_id', homeId.toString());
+            formData.append('orderimg', order.toString());
+
+            const response = await api.post('/home/createImgHome', formData, {
+                headers: { 'Content-Type': 'multipart/form-data' }
+            });
+            return response.data;
+        } catch (error: any) {
+            console.error('❌ Error subiendo imagen:', error.message);
+            throw error;
+        }
+    }
+
     async deleteImageHome(id: number): Promise<boolean> {
         try {
             const response = await api.delete(`/home/deleteImgHome/${id}`);

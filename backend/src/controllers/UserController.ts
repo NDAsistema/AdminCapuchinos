@@ -49,14 +49,22 @@ export class UserController {
     static async update(req: Request, res: Response) {
         try {
             const { id } = req.params;
+            // Extraemos los datos del body
             const { type_user, password } = req.body;
+
             if (!id) return res.status(400).json({ message: 'ID de usuario requerido' });
-            const updatedUser = await UserModel.update(Number(id), {
-                type_user,
-                password
-            });
+
+            // IMPORTANTE: Solo enviamos password al modelo si tiene contenido
+            const updateData: any = { type_user };
+            if (password && password.trim() !== "") {
+                updateData.password = password;
+            }
+
+            const updatedUser = await UserModel.update(Number(id), updateData);
+
             return res.status(200).json({ 
                 success: true, 
+                message: 'Usuario actualizado correctamente',
                 data: updatedUser 
             });
         } catch (error) {

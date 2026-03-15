@@ -36,26 +36,30 @@ export class UserModel {
   }
 
   static async update(id: number, userData: any) {
-    const { type_user, password } = userData;
-    let query: string;
-    let params: any[];
-    if (password && password.trim() !== "") {
-      const salt = await bcrypt.genSalt(10);
-      const hashedPassword = await bcrypt.hash(password, salt);
-      
-      query = 'UPDATE users SET type_user = ?, password = ?, updated_at = NOW() WHERE id = ?';
-      params = [type_user, hashedPassword, id];
-    } else {
-      query = 'UPDATE users SET type_user = ?, updated_at = NOW() WHERE id = ?';
-      params = [type_user, id];
-    }
-    try {
-      await pool.execute(query, params);
-      return { id, type_user };
-    } catch (error) {
-      console.error('Error en UserModel.update:', error);
-      throw error;
-    }
+      const { type_user, password } = userData;
+      let query: string;
+      let params: any[];
+
+      // Verificamos que el password sea un string real y no esté vacío
+      if (password && typeof password === 'string' && password.trim() !== "") {
+          const salt = await bcrypt.genSalt(10);
+          const hashedPassword = await bcrypt.hash(password, salt);
+          
+          query = 'UPDATE users SET type_user = ?, password = ?, updated_at = NOW() WHERE id = ?';
+          params = [type_user, hashedPassword, id];
+      } else {
+          // Si no hay password nuevo, solo actualizamos el rol para no romper el login
+          query = 'UPDATE users SET type_user = ?, updated_at = NOW() WHERE id = ?';
+          params = [type_user, id];
+      }
+
+      try {
+          await pool.execute(query, params);
+          return { id, type_user };
+      } catch (error) {
+          console.error('Error en el modelo al actualizar:', error);
+          throw error;
+      }
   }
 
   static async findByEmail(email: string): Promise<User | null> {
