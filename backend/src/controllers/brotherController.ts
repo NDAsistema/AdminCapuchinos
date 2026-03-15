@@ -5,12 +5,13 @@ import { UserModel, User } from '../models/UserModel';
 import { TypeUserServicesModel, TypeUserServices } from '../models/TypeUserServicesModel';
 import { uploadSingle } from '../middleware/uploadMiddleware';
 import AWSS3Service from '../services/awsS3Service';
+import { AuthRequest } from '../middleware/authMiddleware'; 
 
 export class BrotherController {
 
     // Crear nuevo hermano - CORREGIDO
     // CREAR hermano - VERSIÓN SUPER SIMPLE
-    static async create(req: Request, res: Response) {
+    static async create(req: AuthRequest, res: Response) {
         try {
             uploadSingle(req, res, async (err) => {
                 if (err) {
@@ -19,7 +20,7 @@ export class BrotherController {
                         message: err.message
                     });
                 }
-
+                const created_by = req.user?.id || 0;
                 const { name, email, birth_date, study, cv, server, year_profession } = req.body;
                 
                 if (!name || !email) {
@@ -47,7 +48,7 @@ export class BrotherController {
                 const imageUrl = await AWSS3Service.uploadImage(req.file);
 
                 const brotherData = {
-                    name, email, birth_date, study, cv, server, year_profession,
+                    name, email, birth_date, study, cv, server, year_profession, created_by,
                     img: imageUrl  
                 };
 
@@ -192,7 +193,7 @@ export class BrotherController {
     }
 
     
-    static async update(req: Request, res: Response) {
+    static async update(req: AuthRequest, res: Response) {
         try {
             uploadSingle(req, res, async (err) => {
                 if (err) {
@@ -202,6 +203,7 @@ export class BrotherController {
                     });
                 }
 
+                const created_by = req.user?.id || 0;
                 const id = parseInt(req.params.id);
                 
                 if (isNaN(id)) {
@@ -245,7 +247,8 @@ export class BrotherController {
                     study, 
                     cv, 
                     server, 
-                    year_profession
+                    year_profession,
+                    created_by
                 };
 
                 if (req.file) {
@@ -335,4 +338,25 @@ export class BrotherController {
             });
         }
     }
+
+    /**
+     * Buscar listado de hermanos para crear usuariso 
+     */
+
+    static async searchListBrotherByCreateUsers(req: Request, res: Response) {
+        try {
+            const brothers = await BrotherModel.searchListBrotherByCreateUsers();
+            res.json({
+                success: true,
+                data: brothers
+            });
+        }catch (error) {
+            console.error('Error getting brothers for create user:', error);
+            res.status(500).json({
+                success: false,
+                message: 'Error interno del servidor'
+            });
+        }
+    }
+    
 }

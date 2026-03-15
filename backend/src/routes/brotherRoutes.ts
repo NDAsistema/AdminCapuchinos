@@ -5,6 +5,7 @@ import { BrotherController } from '../controllers/brotherController';
 const router = Router();
 
 // TODAS las rutas igual que en homeRoutes - SIN middleware aquí
+router.get('/searchListBrotherByCreateUsers', BrotherController.searchListBrotherByCreateUsers);
 router.get('/findBrothersForGuardian', BrotherController.findBrothersForGuardian);
 router.get('/findBrothersForParishPriest', BrotherController.findBrothersForParishPriest);
 router.get('/findBrothersForCommunicationUser', BrotherController.findBrothersForCommunicationUser);

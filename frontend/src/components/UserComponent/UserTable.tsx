@@ -12,9 +12,9 @@ export const UserTable: React.FC<UserTableProps> = ({ users, onEdit, onDelete })
             <table className="w-full text-left border-collapse">
                 <thead>
                     <tr className="border-b border-gray-200 dark:border-gray-700 text-gray-400 text-sm uppercase">
-                        <th className="px-4 py-3 font-medium">Usuario / Email</th>
-                        <th className="px-4 py-3 font-medium">Rol</th>
-                        <th className="px-4 py-3 font-medium">Hermano Asoc.</th>
+                        <th className="px-4 py-3 font-medium">Nombre y Apellido</th>
+                        <th className="px-4 py-3 font-medium">Rol</th>  
+                        <th className="px-4 py-3 font-medium">email</th>
                         <th className="px-4 py-3 font-medium text-right">Acciones</th>
                     </tr>
                 </thead>
@@ -24,21 +24,16 @@ export const UserTable: React.FC<UserTableProps> = ({ users, onEdit, onDelete })
                             <tr key={user.id} className="hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors">
                                 <td className="px-4 py-4">
                                     <div className="flex items-center gap-3">
-                                        <div className="w-8 h-8 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center text-blue-600 font-bold">
-                                            {user.email.charAt(0).toUpperCase()}
-                                        </div>
-                                        <span className="text-gray-700 dark:text-gray-200 font-medium">{user.email}</span>
+                                        <span className="text-gray-700 dark:text-gray-200 font-medium">{user.name_brother}</span>
                                     </div>
                                 </td>
                                 <td className="px-4 py-4">
-                                    <span className={`px-2 py-1 rounded-md text-xs font-semibold ${
-                                        user.type_user === 'admin' ? 'bg-purple-100 text-purple-700' : 'bg-gray-100 text-gray-600'
-                                    }`}>
-                                        {user.type_user.toUpperCase()}
+                                    <span className="px-2 py-1 rounded-md text-xs font-semibold">
+                                        {user.typ_name}
                                     </span>
                                 </td>
                                 <td className="px-4 py-4 text-gray-500 dark:text-gray-400">
-                                    {user.name || 'Sin asignar'}
+                                    {user.email}
                                 </td>
                                 <td className="px-4 py-4 text-right">
                                     <button 

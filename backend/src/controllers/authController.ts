@@ -1,14 +1,15 @@
 import { Request, Response } from 'express';
 import { UserModel } from '../models/UserModel';
-  
 import jwt from 'jsonwebtoken';
+import bcrypt from 'bcrypt';
 
 export class AuthController {
+  
+  // MÉTODO: LOGIN
   static async login(req: Request, res: Response) {
     try {
       const { email, password } = req.body;
 
-      // Validaciones básicas
       if (!email || !password) {
         return res.status(400).json({
           success: false,
@@ -25,28 +26,30 @@ export class AuthController {
         });
       }
 
-      if (password !== user.password) {
+      // Comparación segura con Bcrypt
+      const isMatch = await bcrypt.compare(password, user.password);
+      if (!isMatch) {
         return res.status(401).json({
           success: false,
           message: 'Credenciales inválidas'
         });
       }
 
-
+      // Generar Token JWT
       const token = jwt.sign(
         { 
           id: user.id, 
-          id_brotther: user.id_brother, 
+          id_brother: user.id_brother, 
           email: user.email, 
           name_brother: user.name_brother,
-          img_brother:  user.img_brother,
+          img_brother: user.img_brother,
           type_user: user.type_user 
         },
         process.env.JWT_SECRET || 'secret_key',
         { expiresIn: '24h' }
       );
 
-      res.json({
+      return res.json({
         success: true,
         user: {
           id: user.id,
@@ -54,7 +57,7 @@ export class AuthController {
           email: user.email,
           type_user: user.type_user,
           name_brother: user.name_brother,
-          img_brother:  user.img_brother,
+          img_brother: user.img_brother,
           status: user.status
         },
         token,
@@ -63,31 +66,41 @@ export class AuthController {
 
     } catch (error) {
       console.error('Error en login:', error);
-      res.status(500).json({
+      return res.status(500).json({
         success: false,
         message: 'Error interno del servidor'
       });
     }
   }
 
+  // MÉTODO: GET PROFILE (Restaurado y Corregido)
   static async getProfile(req: Request, res: Response) {
     try {
-      // El middleware de auth agregará el usuario al request
+      // El middleware de auth agrega el usuario al request como 'user'
       const user = (req as any).user;
+
+      if (!user) {
+        return res.status(404).json({
+          success: false,
+          message: 'Usuario no encontrado en la sesión'
+        });
+      }
       
-      res.json({
+      return res.json({
         success: true,
         user: {
           id: user.id,
-          id_brother: user.id_brother,
+          id_brother: user.id_brother, // Validar que el middleware use este nombre
           email: user.email,
+          name_brother: user.name_brother,
+          img_brother: user.img_brother,
           type_user: user.type_user,
           status: user.status
         }
       });
     } catch (error) {
       console.error('Error getting profile:', error);
-      res.status(500).json({
+      return res.status(500).json({
         success: false,
         message: 'Error interno del servidor'
       });

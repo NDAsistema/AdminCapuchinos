@@ -12,6 +12,7 @@ export interface Brother {
   year_profession: string | null;  // Permitir null
   img: string | null;
   status?: boolean;
+  created_by: number;
   created_at?: Date;
   updated_at?: Date;
 }
@@ -34,12 +35,13 @@ export class BrotherModel {
       birth_date,
       server,
       year_profession,
-      img
+      img,
+      created_by
     } = brotherData;
 
     const query = `
-      INSERT INTO brothers (name, email, study, cv, birth_date, server, year_profession, img)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO brothers (name, email, study, cv, birth_date, server, year_profession, img, created_by)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
     `;
 
     // Asegurar que ningún valor sea undefined
@@ -51,7 +53,8 @@ export class BrotherModel {
       birth_date || null,  // Usar null para campos de fecha vacíos
       server || '',
       year_profession || null,  // Usar null para campos de fecha vacíos
-      img || null
+      img || null,
+      created_by
     ];
     
     const [result] = await pool.execute(query, values) as any;
@@ -83,7 +86,7 @@ export class BrotherModel {
 
   // Actualizar hermano - CORREGIDO
   static async update(id: number, brotherData: Partial<Brother>): Promise<Brother | null> {
-    const allowedFields = ['name', 'email', 'study', 'cv', 'birth_date', 'server', 'year_profession', 'img', 'status'];
+    const allowedFields = ['name', 'email', 'study', 'cv', 'birth_date', 'server', 'year_profession', 'img', 'status', 'created_by'];
     const updates: string[] = [];
     const values: any[] = [];
 
@@ -141,4 +144,11 @@ export class BrotherModel {
     const [rows] = await pool.execute('SELECT * FROM type_user_services') as any;
     return rows;
   }
+
+  // buscar hermanos para crear usuarios 
+  static async searchListBrotherByCreateUsers(): Promise<Brother[]> {
+    const [rows] = await pool.execute('SELECT b.id, b.name, b.email, b.server, tus.name as nameserver FROM brothers as b LEFT JOIN users as u ON (u.id_brother != b.id) LEFT JOIN type_user_services as tus ON (tus.id = b.server) WHERE b.status = 1 GROUP BY b.id, b.name, b.email, b.server, tus.name ORDER BY b.name') as any;
+    return rows;
+  }
+  
 }

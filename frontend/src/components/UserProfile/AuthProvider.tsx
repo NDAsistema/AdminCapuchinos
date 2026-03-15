@@ -1,59 +1,51 @@
-import { createContext, useContext, useState, useEffect, ReactNode } from "react";
-import { jwtDecode } from "jwt-decode";
-
-interface User {
-  id: number;
-  id_brotther: number;
-  email: string;
-  name_brother: string;
-  img_brother: string;
-  type_user: string;
-}
+import React, { createContext, useContext, useState, useEffect } from "react";
 
 interface AuthContextType {
-  user: User | null;
-  login: (token: string) => void;
+  user: any;
+  login: (userData: any, token: string) => void;
   logout: () => void;
-  loading: boolean; // Añadimos estado de carga
+  loading: boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-export const AuthProvider = ({ children }: { children: ReactNode }) => {
+export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
+  const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
-  
-  // INICIALIZACIÓN SÍNCRONA: Evita el null inicial al recargar
-  const [user, setUser] = useState<User | null>(() => {
-    const token = localStorage.getItem("token");
-    if (token) {
-      try {
-        return jwtDecode<User>(token);
-      } catch {
-        return null;
-      }
-    }
-    return null;
-  });
 
   useEffect(() => {
-    // Marcamos que ya terminó la revisión inicial
-    setLoading(false);
+    const initAuth = () => {
+      try {
+        const savedUser = localStorage.getItem("user");
+        const token = localStorage.getItem("token");
+        if (savedUser && token && savedUser !== "undefined") {
+          setUser(JSON.parse(savedUser));
+        }
+      } catch (e) {
+        console.error("Error cargando sesión", e);
+      } finally {
+        setLoading(false);
+      }
+    };
+    initAuth();
   }, []);
 
-  const login = (token: string) => {
+  const login = (userData: any, token: string) => {
     localStorage.setItem("token", token);
-    const decoded = jwtDecode<User>(token);
-    setUser(decoded);
+    localStorage.setItem("user", JSON.stringify(userData));
+    setUser(userData);
   };
 
   const logout = () => {
     localStorage.removeItem("token");
+    localStorage.removeItem("user");
     setUser(null);
+    window.location.href = "/signin";
   };
 
   return (
     <AuthContext.Provider value={{ user, login, logout, loading }}>
-      {children}
+      {!loading && children}
     </AuthContext.Provider>
   );
 };
