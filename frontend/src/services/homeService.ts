@@ -132,6 +132,36 @@ class HomeService {
             return false;
         }
     }
+
+    async findBrothersForGuardian(): Promise<any> { // Cambiado a any para recibir la data
+        try {
+            const response = await api.get(`/brother/findBrothersForGuardian`); 
+            return response.data.success ? response.data.data : [];
+        } catch (error: any) {
+            console.error('❌ Error obteniendo hermanos para guardián:', error.message);
+            return [];
+        }
+    }
+
+    async findBrothersForParishPriest(): Promise<any> {
+        try {
+            const response = await api.get(`/brother/findBrothersForParishPriest`);
+            return response.data.success ? response.data.data : [];
+        } catch (error: any) {
+            console.error('❌ Error obteniendo hermanos para párroco:', error.message);
+            return [];
+        }
+    }
+
+    async findBrothersForCommunicationUser(): Promise<any> {
+        try {
+            const response = await api.get(`/brother/findBrothersForCommunicationUser`);
+            return response.data.success ? response.data.data : [];
+        } catch (error: any) {
+            console.error('❌ Error obteniendo hermanos para comunicación:', error.message);
+            return [];
+        }
+    }
 }
 
 export default new HomeService();

@@ -201,9 +201,7 @@ export default function ModalGaleryHomeImg({
         }).sort((a, b) => a.orderimg - b.orderimg);
         
         setImages(updatedImages);
-        
-        // Aquí podrías llamar a tu API para actualizar el orderimg
-        // await HomeService.updateImageOrder(id, newOrder);
+      
     };
 
 

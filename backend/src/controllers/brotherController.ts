@@ -106,7 +106,7 @@ export class BrotherController {
         }   
     }
     
-    static async findBrothersForGuardian(req: Request, res: Response) {
+    static async findBrothersForGuardian(req: AuthRequest, res: Response) {
         try {
             const brothers = await BrotherModel.findBrothersForGuardian();
             res.json({
@@ -123,7 +123,7 @@ export class BrotherController {
         }   
     }
 
-    static async findBrothersForParishPriest(req: Request, res: Response) {
+    static async findBrothersForParishPriest(req: AuthRequest, res: Response) {
         try {
             const brothers = await BrotherModel.findBrothersForParishPriest();
             res.json({
@@ -140,7 +140,7 @@ export class BrotherController {
         }   
     }
 
-    static async findBrothersForCommunicationUser(req: Request, res: Response) {
+    static async findBrothersForCommunicationUser(req: AuthRequest, res: Response) {
         try {
             const brothers = await UserModel.findListUsersType(3);
             res.json({
