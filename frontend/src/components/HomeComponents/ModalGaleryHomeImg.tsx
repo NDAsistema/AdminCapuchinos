@@ -50,7 +50,6 @@ export default function ModalGaleryHomeImg({
             if (response && Array.isArray(response)) {
                 const sortedImages = response.sort((a, b) => a.orderimg - b.orderimg);
                 setImages(sortedImages);
-                // Actualizar próximo orderimg
                 setNewImage(prev => ({ ...prev, orderimg: sortedImages.length + 1 }));
             }
         } catch (error) {
@@ -122,7 +121,7 @@ export default function ModalGaleryHomeImg({
             if (result.isConfirmed) {
                 try {
                     const deleteImgHome = await HomeService.deleteImgHome(id);
-                    if(deleteImgHome.success){
+                    if(deleteImgHome){
                         const updatedImages = images.filter(img => img.id !== id);
                         const reorderedImages = updatedImages
                             .map((img, index) => ({ ...img, orderimg: index + 1 }))
