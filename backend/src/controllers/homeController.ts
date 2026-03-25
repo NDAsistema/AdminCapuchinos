@@ -4,6 +4,7 @@ import { HomeImageModel, HomeImage } from '../models/HomeImageModel';
 import { uploadSingle } from '../middleware/uploadMiddleware';
 import AWSS3Service from '../services/awsS3Service';
 import { AuthRequest } from '../middleware/authMiddleware'; 
+import { GroupsImageModel } from '../models/GroupsImageModel';  
 
 export class HomeController {
     
@@ -125,9 +126,14 @@ export class HomeController {
         try {
             const id = parseInt(req.params.id);
             if (isNaN(id)) return res.status(400).json({ success: false, message: 'ID inválido' });
+
+            const images = await GroupsImageModel.findById(id);
+            console.log(images);
+           
+
             
-            const deleted = await HomeModel.delete(id);
-            if (!deleted) return res.status(404).json({ success: false, message: 'No encontrada' });
+            /*const deleted = await HomeModel.delete(id);
+            if (!deleted) return res.status(404).json({ success: false, message: 'No encontrada' });*/
             
             res.json({ success: true, message: 'Eliminada exitosamente' });
         } catch (error: any) {

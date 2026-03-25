@@ -13,8 +13,6 @@ router.delete('/:id', HomeController.delete);
 // Rutas específicas
 router.get('/getAllImgById/:id', HomeController.getAllImgById);
 router.delete('/deleteImgHome/:id', HomeController.deleteImgHome);
-
-// Ruta para crear imagen - SIN uploadSingle aquí (está en el controller)
 router.post('/createImgHome', HomeController.createImgHome);
 
 export default router;
