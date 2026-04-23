@@ -7,7 +7,7 @@ import { TypeUserModel } from '../models/TypeUserModel';
 
 export class UserController {
 
-    private static getUserId(req: Request): number {
+    static getUserId(req: Request): number {
         const user = (req as any).user;
         return user?.id || 1; 
     }

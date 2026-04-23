@@ -165,13 +165,11 @@ export default function ModalGaleryHomeImg({
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (file) {
-            // Validar tipo de archivo
             if (!file.type.match('image.*')) {
                 alert('Por favor, selecciona solo archivos de imagen');
                 return;
             }
             
-            // Validar tamaño (máximo 5MB)
             if (file.size > 5 * 1024 * 1024) {
                 alert('La imagen no debe superar los 5MB');
                 return;
