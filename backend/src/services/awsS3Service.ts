@@ -85,6 +85,23 @@ export class AWSS3Service {
         return `https://${this.bucketName}.s3.${process.env.AWS_REGION}.amazonaws.com/${key}`;
     }
 
+    async uploadNewspapersImage(file: Express.Multer.File): Promise<string> {
+        const fileExtension = file.originalname.split('.').pop();
+        const key = `Newspapers/${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExtension}`;
+
+        const command = new PutObjectCommand({
+            Bucket: this.bucketName,
+            Key: key,
+            Body: file.buffer,
+            ContentType: file.mimetype,
+            ACL: 'public-read',
+        });
+
+        await this.s3Client.send(command);
+        
+        return `https://${this.bucketName}.s3.${process.env.AWS_REGION}.amazonaws.com/${key}`;
+    }
+
     async deleteIconGroupImage(imageUrl: string): Promise<void> {
         try {
             const parts = imageUrl.split('.amazonaws.com/');

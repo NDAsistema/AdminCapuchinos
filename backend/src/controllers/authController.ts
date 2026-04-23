@@ -4,6 +4,12 @@ import jwt from 'jsonwebtoken';
 import bcrypt from 'bcrypt';
 
 export class AuthController {
+
+
+  static getUserId(req: Request): number {
+    const user = (req as any).user;
+    return user?.id || 1; 
+  }
   
   // MÉTODO: LOGIN
   static async login(req: Request, res: Response) {

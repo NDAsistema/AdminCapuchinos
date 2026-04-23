@@ -28,6 +28,7 @@ import Brotthers  from "./pages/Brotthers/Brotthers";
 import Homes from "./pages/homes/Homes";
 import Groups from "./pages/groups/Groups";
 import Users from "./pages/users/Users";
+import Newspaper from "./pages/newspaper/newspaper";
 
 export default function App() {
   return (
@@ -47,6 +48,7 @@ export default function App() {
               <Route path="/Fraternidades" element={<Homes />} />
               <Route path="/Grupos" element={<Groups />} />
               <Route path="/Usuarios" element={<Users />} />
+              <Route path="/Noticias" element={<Newspaper />} />
 
 
 
