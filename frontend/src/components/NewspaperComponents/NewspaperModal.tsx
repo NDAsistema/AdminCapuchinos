@@ -101,18 +101,25 @@ export const NewspaperModal: React.FC<Props> = ({ isOpen, onClose, onSuccess, in
         formData.append('type_assing', typeAssing);
         formData.append('idAssing', idAssing);
         
-        // Solo adjuntamos imagen si el usuario seleccionó una nueva
         if (image) {
             formData.append('image', image);
         }
 
         try {
             if (isEdit) {
-                await NewspaperService.updateNews(initialData.id, formData);
-                Swal.fire('¡Actualizado!', 'La noticia se actualizó correctamente', 'success');
+                let resp = await NewspaperService.updateNews(initialData.id, formData);
+                if(resp.success){
+                    Swal.fire('¡Actualizado!', 'La noticia se actualizó correctamente', 'success');
+                }else{
+                    Swal.fire('Error', 'No se pudo procesar la solicitud', 'error');
+                }
             } else {
-                await NewspaperService.createNews(formData);
-                Swal.fire('¡Creado!', 'La noticia se publicó con éxito', 'success');
+                let resp = await NewspaperService.createNews(formData);
+                if(resp.success){
+                    Swal.fire('¡Creado!', 'La noticia se publicó con éxito', 'success');
+                }else{
+                    Swal.fire('Error', 'No se pudo procesar la solicitud', 'error');
+                }
             }
             onSuccess();
             onClose();

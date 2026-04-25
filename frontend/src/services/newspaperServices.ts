@@ -47,7 +47,7 @@ class NewspaperService {
     async getAllNewspapers(): Promise<Newspaper[]> {
         try {
             const response = await api.get('/newspaper/listAllNewspaper');
-            return response.data.success ? response.data.data : response.data;
+            return response.data.data;
         } catch (error: any) {
             console.error('❌ Error obteniendo periódicos:', error.message);
             return [];
@@ -56,9 +56,10 @@ class NewspaperService {
 
     async createNews(formData: FormData): Promise<void> {
         try {
-            await api.post('/newspaper/createNews', formData, {
+            const response = await api.post('/newspaper/createNews', formData, {
                 headers: { 'Content-Type': 'multipart/form-data' },
             });
+            return response.data;
         } catch (error: any) {
             console.error('❌ Error creando noticia:', error.message);
             throw error;
@@ -76,9 +77,10 @@ class NewspaperService {
 
     async updateNews(id: number, formData: FormData): Promise<void> {
         try {
-            await api.put(`/newspaper/updateNews/${id}`, formData, {        
+            const response = await api.put(`/newspaper/updateNews/${id}`, formData, {        
                 headers: { 'Content-Type': 'multipart/form-data' },
             });
+            return response.data;
         } catch (error: any) {
             console.error('❌ Error actualizando noticia:', error.message);
             throw error;

@@ -32,33 +32,29 @@ export const NewspaperTable: React.FC<NewspaperTableProps> = ({ newspaper, onEdi
 
     return (
         <div className="space-y-6">
-            {/* Header: Título y Botón Único */}
             <div className="flex justify-between items-center">
+                <div className="relative max-w-sm">
+                    <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                        <svg className="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                        </svg>
+                    </div>
+                    <input
+                        type="text"
+                        placeholder="Buscar noticia por nombre..."
+                        className="block w-full pl-11 pr-4 py-3 border border-gray-100 rounded-2xl focus:ring-2 focus:ring-blue-500 outline-none bg-white text-gray-500 shadow-sm text-sm"
+                        value={searchTerm}
+                        onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }}
+                    />
+                </div>
                 <button 
-                    onClick={onNew} // Dispara la función handleCreate de la vista principal
+                    onClick={onNew} 
                     className="bg-[#1d4ed8] hover:bg-blue-700 text-white px-6 py-2.5 rounded-xl font-bold shadow-lg shadow-blue-100 transition-all active:scale-95 text-sm"
                 >
                     + Nueva Noticia
                 </button>
             </div>
 
-            {/* Buscador */}
-            <div className="relative max-w-sm">
-                <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                    <svg className="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                    </svg>
-                </div>
-                <input
-                    type="text"
-                    placeholder="Buscar noticia por nombre..."
-                    className="block w-full pl-11 pr-4 py-3 border border-gray-100 rounded-2xl focus:ring-2 focus:ring-blue-500 outline-none bg-white text-gray-500 shadow-sm text-sm"
-                    value={searchTerm}
-                    onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }}
-                />
-            </div>
-
-            {/* Tabla Estilo Card */}
             <div className="bg-white rounded-[2rem] shadow-sm border border-gray-50 overflow-hidden">
                 <table className="min-w-full">
                     <thead>
@@ -84,10 +80,10 @@ export const NewspaperTable: React.FC<NewspaperTableProps> = ({ newspaper, onEdi
                                 <td className="px-8 py-6 text-right">
                                     <div className="flex justify-end gap-4">
                                         <button onClick={() => onEdit(item)} className="text-[11px] font-black text-gray-400 hover:text-blue-600 uppercase">
-                                            Editar
+                                            ✏️
                                         </button>
                                         <button onClick={() => onDelete(item.id)} className="text-[11px] font-black text-gray-400 hover:text-red-500 uppercase">
-                                            Eliminar
+                                            🗑️
                                         </button>
                                     </div>
                                 </td>
