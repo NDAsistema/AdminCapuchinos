@@ -29,6 +29,7 @@ import Homes from "./pages/homes/Homes";
 import Groups from "./pages/groups/Groups";
 import Users from "./pages/users/Users";
 import Newspaper from "./pages/newspaper/newspaper";
+import Tasks from "./pages/task/task";
 
 export default function App() {
   return (
@@ -49,10 +50,7 @@ export default function App() {
               <Route path="/Grupos" element={<Groups />} />
               <Route path="/Usuarios" element={<Users />} />
               <Route path="/Noticias" element={<Newspaper />} />
-
-
-
-
+              <Route path="/Tareas" element={<Tasks />} />
               {/* Others Page */}
               <Route path="/profile" element={<UserProfiles />} />
               <Route path="/calendar" element={<Calendar />} />

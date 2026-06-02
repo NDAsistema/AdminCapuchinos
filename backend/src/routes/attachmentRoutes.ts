@@ -11,5 +11,6 @@ const upload = multer({
 });
 
 router.post('/upload-newspaper-image', upload.single('file'), AttachmentController.uploadFromEditor);
+router.post('/upload-task-image', upload.single('file'), AttachmentController.uploadFromEditorTask);
 
 export default router;

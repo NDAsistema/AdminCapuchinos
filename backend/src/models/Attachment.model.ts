@@ -5,6 +5,7 @@ export interface Attachment {
     url: string;
     filename?: string;
     id_newspaper: number | null;
+    type: number;
     status: 'temp' | 'active';
     created_by: number;
     created_at?: Date;
@@ -17,23 +18,19 @@ export class AttachmentModel {
     /**
      * Crea un registro inicial cuando Froala sube la imagen (Status: temp)
      */
-    static async create(data: { url: string; filename: string; created_by: number }): Promise<Attachment> {
+    static async create(data: { url: string; filename: string; created_by: number, type: number }): Promise<Attachment> {
         const query = `
             INSERT INTO newspaper_attachments 
-            (url, filename, created_by, status)
-            VALUES (?, ?, ?, 'temp')
+            (url, filename, created_by, type, status)
+            VALUES (?, ?, ?, ?, 'temp')
         `;
-        
-        const values = [data.url, data.filename, data.created_by];
-
+        const values = [data.url, data.filename, data.created_by, data.type];
         try {
             const [result] = await pool.execute(query, values) as any;
-            
             const [newRecord] = await pool.execute(
                 'SELECT * FROM newspaper_attachments WHERE id = ?',
                 [result.insertId]
             ) as any;
-
             return newRecord[0];
         } catch (error) {
             console.error('❌ Error guardando adjunto:', error);

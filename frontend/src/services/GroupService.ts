@@ -160,6 +160,18 @@ class GroupService {
       return false;
     }
   }
+
+  static async getAllGroups() {
+    try {
+      const response = await api.get('/group');
+      console.log(response.data.data);
+      return response.data.data || response.data;
+    } catch (error) {
+      console.error('Error al obtener grupos:', error);
+      throw error;
+    }
+  }
+
 }
 
 export default GroupService;

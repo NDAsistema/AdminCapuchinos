@@ -11,6 +11,7 @@ import groupRoutes from './routes/GroupRoutes';
 import userRoutes from './routes/userRoutes';
 import newspaperRoutes from './routes/newspaperRoutes';
 import attachment from './routes/attachmentRoutes';
+import taskRoutes from './routes/taskRoutes';
 import { authMiddleware } from './middleware/authMiddleware';
 
 // Cargar variables de entorno
@@ -40,6 +41,7 @@ app.use('/api/group', authMiddleware, groupRoutes);
 app.use('/api/user', authMiddleware, userRoutes);
 app.use('/api/newspaper', authMiddleware, newspaperRoutes);
 app.use('/api/attachments', authMiddleware, attachment);
+app.use('/api/tasks', taskRoutes);
 //app.use('/api/group', authMiddleware, groupRoutes);
 
 // Ruta de prueba de base de datos
