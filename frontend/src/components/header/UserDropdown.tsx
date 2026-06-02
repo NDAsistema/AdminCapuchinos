@@ -1,10 +1,13 @@
 import { useState, useRef, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { useAuth } from "../UserProfile/AuthProvider";
+import { usePermissions } from "../../hooks/usePermissions";
+import { MODULE_PATHS } from "../../config/permissions";
 
 export default function UserDropdown() {
   const [isOpen, setIsOpen] = useState(false);
   const { user, logout } = useAuth();
+  const { roleLabel, canAccess } = usePermissions();
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   // Cerrar al hacer clic fuera del menú
@@ -61,21 +64,23 @@ export default function UserDropdown() {
           <div className="px-4 py-3 border-b border-gray-50 mb-1">
             <p className="text-xs text-gray-400 font-medium uppercase tracking-wider">Cuenta</p>
             <p className="text-sm font-bold text-gray-800 truncate">{user.email}</p>
-            <p className="text-[11px] text-blue-500 font-bold mt-0.5">
-              {user.type_user === 1 ? "ADMINISTRADOR" : "USUARIO"}
+            <p className="text-[11px] text-blue-500 font-bold mt-0.5 uppercase">
+              {roleLabel}
             </p>
           </div>
 
-          <Link
-            to="/profile"
-            className="flex items-center px-4 py-2 text-sm text-gray-600 hover:bg-gray-50 hover:text-blue-600 transition-colors"
-            onClick={() => setIsOpen(false)}
-          >
-            <svg className="w-4 h-4 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-            </svg>
-            Mi Perfil
-          </Link>
+          {canAccess(MODULE_PATHS.PROFILE) && (
+            <Link
+              to={MODULE_PATHS.PROFILE}
+              className="flex items-center px-4 py-2 text-sm text-gray-600 hover:bg-gray-50 hover:text-blue-600 transition-colors"
+              onClick={() => setIsOpen(false)}
+            >
+              <svg className="w-4 h-4 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+              </svg>
+              Mi Perfil
+            </Link>
+          )}
 
           <button
             onClick={() => {

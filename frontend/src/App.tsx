@@ -19,6 +19,7 @@ import AppLayout from "./layout/AppLayout";
 import { ScrollToTop } from "./components/common/ScrollToTop";
 import Home from "./pages/Dashboard/Home";
 import ProtectedRoute from "./components/ProtectedRoute";
+import RoutePermissionGuard from "./components/RoutePermissionGuard";
 import { AuthProvider } from './components/UserProfile/AuthProvider';
 
 
@@ -44,35 +45,28 @@ export default function App() {
                 <AppLayout />
               </ProtectedRoute>
             }>
-              <Route index path="/" element={<Home />} />
-              <Route path="/Hermanos" element={<Brotthers />} />
-              <Route path="/Fraternidades" element={<Homes />} />
-              <Route path="/Grupos" element={<Groups />} />
-              <Route path="/Usuarios" element={<Users />} />
-              <Route path="/Noticias" element={<Newspaper />} />
-              <Route path="/Tareas" element={<Tasks />} />
-              {/* Others Page */}
-              <Route path="/profile" element={<UserProfiles />} />
-              <Route path="/calendar" element={<Calendar />} />
-              <Route path="/blank" element={<Blank />} />
-
-              {/* Forms */}
-              <Route path="/form-elements" element={<FormElements />} />
-
-              {/* Tables */}
-              <Route path="/basic-tables" element={<BasicTables />} />
-
-              {/* Ui Elements */}
-              <Route path="/alerts" element={<Alerts />} />
-              <Route path="/avatars" element={<Avatars />} />
-              <Route path="/badge" element={<Badges />} />
-              <Route path="/buttons" element={<Buttons />} />
-              <Route path="/images" element={<Images />} />
-              <Route path="/videos" element={<Videos />} />
-
-              {/* Charts */}
-              <Route path="/line-chart" element={<LineChart />} />
-              <Route path="/bar-chart" element={<BarChart />} />
+              <Route element={<RoutePermissionGuard />}>
+                <Route index path="/" element={<Home />} />
+                <Route path="/Hermanos" element={<Brotthers />} />
+                <Route path="/Fraternidades" element={<Homes />} />
+                <Route path="/Grupos" element={<Groups />} />
+                <Route path="/Usuarios" element={<Users />} />
+                <Route path="/Noticias" element={<Newspaper />} />
+                <Route path="/Tareas" element={<Tasks />} />
+                <Route path="/profile" element={<UserProfiles />} />
+                <Route path="/calendar" element={<Calendar />} />
+                <Route path="/blank" element={<Blank />} />
+                <Route path="/form-elements" element={<FormElements />} />
+                <Route path="/basic-tables" element={<BasicTables />} />
+                <Route path="/alerts" element={<Alerts />} />
+                <Route path="/avatars" element={<Avatars />} />
+                <Route path="/badge" element={<Badges />} />
+                <Route path="/buttons" element={<Buttons />} />
+                <Route path="/images" element={<Images />} />
+                <Route path="/videos" element={<Videos />} />
+                <Route path="/line-chart" element={<LineChart />} />
+                <Route path="/bar-chart" element={<BarChart />} />
+              </Route>
             </Route>
 
             {/* Auth Layout - PÚBLICAS */}
