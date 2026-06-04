@@ -49,27 +49,43 @@ export class UserController {
     static async update(req: Request, res: Response) {
         try {
             const { id } = req.params;
-            // Extraemos los datos del body
             const { type_user, password } = req.body;
 
             if (!id) return res.status(400).json({ message: 'ID de usuario requerido' });
 
-            // IMPORTANTE: Solo enviamos password al modelo si tiene contenido
-            const updateData: any = { type_user };
-            if (password && password.trim() !== "") {
-                updateData.password = password;
+            const updateData: { type_user: number; password?: string } = {
+                type_user: Number(type_user),
+            };
+
+            const plainPassword =
+                typeof password === 'string' ? password.trim() : '';
+
+            if (plainPassword !== '') {
+                if (plainPassword.length < 6) {
+                    return res.status(400).json({
+                        message: 'La contraseña debe tener al menos 6 caracteres',
+                    });
+                }
+                updateData.password = plainPassword;
             }
 
             const updatedUser = await UserModel.update(Number(id), updateData);
 
-            return res.status(200).json({ 
-                success: true, 
-                message: 'Usuario actualizado correctamente',
-                data: updatedUser 
+            const message = updatedUser.passwordUpdated
+                ? 'Usuario y contraseña actualizados correctamente'
+                : 'Rol de usuario actualizado (la contraseña no fue modificada)';
+
+            return res.status(200).json({
+                success: true,
+                message,
+                passwordUpdated: updatedUser.passwordUpdated,
+                data: updatedUser,
             });
-        } catch (error) {
+        } catch (error: any) {
             console.error('Error al actualizar:', error);
-            return res.status(500).json({ message: 'Error interno al actualizar usuario' });
+            return res.status(500).json({
+                message: error.message || 'Error interno al actualizar usuario',
+            });
         }
     }
 

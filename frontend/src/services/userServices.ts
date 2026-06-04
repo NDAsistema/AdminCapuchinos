@@ -87,10 +87,16 @@ class UserService {
     /**
      * Actualiza los datos de un usuario existente
      */
-    async updateUser(id: number, userData: Partial<CreateUserData>): Promise<User | null> {
+    async updateUser(
+        id: number,
+        userData: Partial<CreateUserData>
+    ): Promise<{ passwordUpdated?: boolean } | null> {
         try {
             const response = await api.put(`/user/update/${id}`, userData);
-            return response.data.data;
+            return {
+                ...response.data.data,
+                passwordUpdated: response.data.passwordUpdated,
+            };
         } catch (error: any) {
             console.error('❌ Error actualizando usuario:', error.message);
             throw error;

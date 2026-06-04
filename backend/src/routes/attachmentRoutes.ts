@@ -1,7 +1,7 @@
 
 import { Router } from 'express';
 import multer from 'multer';
-import { AttachmentController } from '../controllers/attachmentController';
+import { AttachmentController } from '../controllers/AttachmentController';
 
 const router = Router();
 

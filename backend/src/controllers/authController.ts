@@ -14,7 +14,8 @@ export class AuthController {
   // MÉTODO: LOGIN
   static async login(req: Request, res: Response) {
     try {
-      const { email, password } = req.body;
+      const email = typeof req.body.email === 'string' ? req.body.email.trim().toLowerCase() : '';
+      const password = typeof req.body.password === 'string' ? req.body.password : '';
 
       if (!email || !password) {
         return res.status(400).json({
@@ -23,7 +24,6 @@ export class AuthController {
         });
       }
 
-      // Buscar usuario por email
       const user = await UserModel.findByEmail(email);
       if (!user) {
         return res.status(401).json({
@@ -32,8 +32,16 @@ export class AuthController {
         });
       }
 
-      // Comparación segura con Bcrypt
-      const isMatch = await bcrypt.compare(password, user.password);
+      const storedPassword = user.password?.trim() || '';
+      if (!storedPassword.startsWith('$2')) {
+        console.error(`Usuario ${user.id}: contraseña en BD no está hasheada con bcrypt`);
+        return res.status(401).json({
+          success: false,
+          message: 'Credenciales inválidas',
+        });
+      }
+
+      const isMatch = await bcrypt.compare(password, storedPassword);
       if (!isMatch) {
         return res.status(401).json({
           success: false,

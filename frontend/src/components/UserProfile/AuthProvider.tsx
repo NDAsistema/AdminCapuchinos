@@ -19,7 +19,11 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         const savedUser = localStorage.getItem("user");
         const token = localStorage.getItem("token");
         if (savedUser && token && savedUser !== "undefined") {
-          setUser(JSON.parse(savedUser));
+          const parsed = JSON.parse(savedUser);
+          setUser({
+            ...parsed,
+            type_user: Number(parsed.type_user),
+          });
         }
       } catch (e) {
         console.error("Error cargando sesión", e);
@@ -31,9 +35,13 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   }, []);
 
   const login = (userData: any, token: string) => {
+    const normalized = {
+      ...userData,
+      type_user: Number(userData.type_user),
+    };
     localStorage.setItem("token", token);
-    localStorage.setItem("user", JSON.stringify(userData));
-    setUser(userData);
+    localStorage.setItem("user", JSON.stringify(normalized));
+    setUser(normalized);
   };
 
   const logout = () => {

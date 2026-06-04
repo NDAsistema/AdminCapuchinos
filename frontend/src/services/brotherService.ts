@@ -100,6 +100,11 @@ class BrotherService {
         return response.data.data;
     }
 
+    async findUsersInCommsScope(): Promise<any[]> {
+        const response = await api.get('/brother/usersInCommsScope');
+        return response.data.data || [];
+    }
+
     async findBrothersForCommunicationUser(): Promise<any[]> {
         const response = await api.get('/brother/findBrothersForCommunicationUser');
         return response.data.data;

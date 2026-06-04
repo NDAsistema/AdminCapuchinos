@@ -7,9 +7,18 @@ export class AuthHelper {
      */
     static getAuthenticatedUser(req: Request) {
         const user = (req as any).user;
+        if (!user?.id) {
+            throw new Error('Usuario no autenticado');
+        }
+        const typeUser = Number(user.type_user);
+        if (!Number.isFinite(typeUser)) {
+            throw new Error('Sesión inválida: vuelve a iniciar sesión');
+        }
         return {
-            id: user?.id || 1,
-            type_user: user?.type_user || 1
+            id: Number(user.id),
+            id_brother: user.id_brother != null ? Number(user.id_brother) : null,
+            type_user: typeUser,
+            name_brother: user.name_brother,
         };
     }
 }

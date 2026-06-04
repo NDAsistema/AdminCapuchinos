@@ -150,5 +150,21 @@ export class BrotherModel {
     const [rows] = await pool.execute('SELECT b.id, b.name, b.email, b.server, tus.name as nameserver FROM brothers as b LEFT JOIN users as u ON (u.id_brother != b.id) LEFT JOIN type_user_services as tus ON (tus.id = b.server) WHERE b.status = 1 GROUP BY b.id, b.name, b.email, b.server, tus.name ORDER BY b.name') as any;
     return rows;
   }
+
+  /** Usuarios estándar en grupos de fraternidades del responsable de comunicaciones */
+  static async findUsersInCommsScope(communicationBrotherId: number): Promise<any[]> {
+    const [rows] = await pool.execute(
+      `SELECT DISTINCT u.id, b.name AS name
+       FROM users u
+       INNER JOIN brothers b ON b.id = u.id_brother AND b.status = 1
+       INNER JOIN releations_groups_brotthers rgb ON rgb.id_brotther = b.id AND rgb.status = 1
+       INNER JOIN releations_home_groups rhg ON rhg.id_group = rgb.id_group
+       INNER JOIN homes h ON h.id = rhg.id_home AND h.status = 1 AND h.communication_user = ?
+       WHERE u.type_user = 2 AND u.status = 1
+       ORDER BY b.name ASC`,
+      [communicationBrotherId]
+    );
+    return rows as any[];
+  }
   
 }

@@ -1,6 +1,11 @@
 import { pool } from '../config/database';
 import bcrypt from 'bcrypt';
 
+/** Evita hashear de nuevo un valor que ya es hash bcrypt */
+function isBcryptHash(value: string): boolean {
+  return /^\$2[aby]\$\d{2}\$.{53}$/.test(value);
+}
+
 export interface User {
   id: number;
   id_brother: number | null;
@@ -36,26 +41,46 @@ export class UserModel {
   }
 
   static async update(id: number, userData: any) {
-      const { type_user, password } = userData;
+      const type_user = Number(userData.type_user);
+      const rawPassword =
+          typeof userData.password === 'string' ? userData.password.trim() : '';
+
+      if (!Number.isFinite(type_user) || type_user < 1) {
+          throw new Error('Tipo de usuario inválido');
+      }
+
       let query: string;
       let params: any[];
+      let passwordUpdated = false;
 
-      // Verificamos que el password sea un string real y no esté vacío
-      if (password && typeof password === 'string' && password.trim() !== "") {
+      if (rawPassword !== '') {
+          if (isBcryptHash(rawPassword)) {
+              throw new Error('La contraseña no puede ser un hash; ingrese texto plano');
+          }
           const salt = await bcrypt.genSalt(10);
-          const hashedPassword = await bcrypt.hash(password, salt);
-          
-          query = 'UPDATE users SET type_user = ?, password = ?, updated_at = NOW() WHERE id = ?';
+          const hashedPassword = await bcrypt.hash(rawPassword, salt);
+
+          if (hashedPassword.length < 60) {
+              throw new Error('Error al generar hash de contraseña');
+          }
+
+          query = 'UPDATE users SET type_user = ?, password = ?, updated_at = NOW() WHERE id = ? AND status = 1';
           params = [type_user, hashedPassword, id];
+          passwordUpdated = true;
       } else {
-          // Si no hay password nuevo, solo actualizamos el rol para no romper el login
-          query = 'UPDATE users SET type_user = ?, updated_at = NOW() WHERE id = ?';
+          query = 'UPDATE users SET type_user = ?, updated_at = NOW() WHERE id = ? AND status = 1';
           params = [type_user, id];
       }
 
       try {
-          await pool.execute(query, params);
-          return { id, type_user };
+          const [result] = await pool.execute(query, params);
+          const affectedRows = (result as { affectedRows?: number }).affectedRows ?? 0;
+
+          if (affectedRows === 0) {
+              throw new Error('Usuario no encontrado o inactivo');
+          }
+
+          return { id, type_user, passwordUpdated };
       } catch (error) {
           console.error('Error en el modelo al actualizar:', error);
           throw error;
@@ -65,8 +90,8 @@ export class UserModel {
   static async findByEmail(email: string): Promise<User | null> {
     try {
       const [rows] = await pool.execute(
-        'SELECT u.*, b.name as name_brother, b.img as img_brother FROM users as u LEFT JOIN brothers as b on (b.id = u.id_brother) WHERE u.email = ? AND u.status = 1',
-        [email]
+        'SELECT u.*, b.name as name_brother, b.img as img_brother FROM users as u LEFT JOIN brothers as b on (b.id = u.id_brother) WHERE LOWER(TRIM(u.email)) = ? AND u.status = 1',
+        [email.trim().toLowerCase()]
       );
       
       const users = rows as User[];
@@ -110,7 +135,7 @@ export class UserModel {
   {
     try {
       const [rows] = await pool.execute(
-        'SELECT u.id, u.type_user, u.email, u.password, b.name as name_brother, b.img, tu.name as typ_name FROM users u LEFT JOIN brothers b ON (b.id = u.id_brother) LEFT JOIN type_users tu on (tu.id = u.type_user) WHERE u.status = 1 AND b.status = 1 ORDER BY b.name'
+        'SELECT u.id, u.type_user, u.email, b.name as name_brother, b.img, tu.name as typ_name FROM users u LEFT JOIN brothers b ON (b.id = u.id_brother) LEFT JOIN type_users tu on (tu.id = u.type_user) WHERE u.status = 1 AND b.status = 1 ORDER BY b.name'
       );
       return rows as User[];
     } catch (error) {

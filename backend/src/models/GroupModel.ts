@@ -86,4 +86,17 @@ export class GroupModel {
         return result;
     }
 
+    static async findByCommunicationBrother(brotherId: number) {
+        const [rows] = await pool.execute(
+            `SELECT DISTINCT g.id, g.name, g.activity, h.name AS home_name
+             FROM \`groups\` g
+             INNER JOIN releations_home_groups rhg ON rhg.id_group = g.id
+             INNER JOIN homes h ON h.id = rhg.id_home AND h.status = 1
+             WHERE g.status = 1 AND h.communication_user = ?
+             ORDER BY g.name ASC`,
+            [brotherId]
+        );
+        return rows;
+    }
+
 }

@@ -4,6 +4,9 @@ import { TaskController } from '../controllers/TaskController';
 const router = Router();
 
 router.get('/', TaskController.getAllTask);
+router.get('/:id', TaskController.getTaskDetail);
+router.post('/:id/submit-report', TaskController.submitReport);
+router.patch('/reports/:id/review', TaskController.reviewReport);
 
 router.post('/', TaskController.createTask);
 

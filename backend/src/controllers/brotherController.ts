@@ -158,6 +158,20 @@ export class BrotherController {
         }
     }
 
+    static async findUsersInCommsScope(req: AuthRequest, res: Response) {
+        try {
+            const brotherId = req.user?.id_brother;
+            if (!brotherId) {
+                return res.json({ success: true, data: [], count: 0 });
+            }
+            const users = await BrotherModel.findUsersInCommsScope(Number(brotherId));
+            res.json({ success: true, data: users, count: users.length });
+        } catch (error) {
+            console.error('Error getting users in comms scope:', error);
+            res.status(500).json({ success: false, message: 'Error interno del servidor' });
+        }
+    }
+
     static async getById(req: Request, res: Response) {
         try {
             const id = parseInt(req.params.id);

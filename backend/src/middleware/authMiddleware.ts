@@ -5,7 +5,7 @@ import jwt from 'jsonwebtoken';
 export interface AuthRequest extends Request {
   user?: {
     id: number;
-    id_brotther: number;
+    id_brother: number | null;
     email: string;
     name_brother: string;
     img_brother: string;
@@ -25,9 +25,10 @@ export const authMiddleware = (req: AuthRequest, res: Response, next: NextFuncti
         const secret = process.env.JWT_SECRET || 'secret_key';
         const decoded = jwt.verify(token, secret) as any;
 
+        const idBrother = decoded.id_brother ?? decoded.id_brotther;
         req.user = {
             id: Number(decoded.id),
-            id_brotther: Number(decoded.id_brotther),
+            id_brother: idBrother != null && idBrother !== '' ? Number(idBrother) : null,
             email: decoded.email,
             name_brother: decoded.name_brother,
             img_brother: decoded.img_brother,

@@ -172,6 +172,16 @@ class GroupService {
     }
   }
 
+  static async findGroupsForCommunicationUser() {
+    try {
+      const response = await api.get('/group/forCommunicationUser');
+      return response.data.data || [];
+    } catch (error) {
+      console.error('Error al obtener grupos de comunicaciones:', error);
+      return [];
+    }
+  }
+
 }
 
 export default GroupService;
