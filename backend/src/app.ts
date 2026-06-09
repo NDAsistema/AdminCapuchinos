@@ -13,7 +13,10 @@ import newspaperRoutes from './routes/newspaperRoutes';
 import attachment from './routes/attachmentRoutes';
 import taskRoutes from './routes/taskRoutes';
 import notificationRoutes from './routes/notificationRoutes';
+import calendarRoutes from './routes/calendarRoutes';
+import eventRoutes from './routes/eventRoutes';
 import { authMiddleware } from './middleware/authMiddleware';
+import { EventReminderService } from './services/EventReminderService';
 
 // Cargar variables de entorno
 dotenv.config();
@@ -44,6 +47,8 @@ app.use('/api/newspaper', authMiddleware, newspaperRoutes);
 app.use('/api/attachments', authMiddleware, attachment);
 app.use('/api/tasks', authMiddleware, taskRoutes);
 app.use('/api/notifications', authMiddleware, notificationRoutes);
+app.use('/api/calendars', authMiddleware, calendarRoutes);
+app.use('/api/events', authMiddleware, eventRoutes);
 //app.use('/api/group', authMiddleware, groupRoutes);
 
 // Ruta de prueba de base de datos
@@ -84,6 +89,12 @@ async function startServer() {
       console.log(`🌍 Environment: ${process.env.NODE_ENV}`);
       console.log(`🗄️ Base de datos: ${process.env.DB_NAME}`);
       console.log(`🔗 URL: http://localhost:${PORT}`);
+
+      setInterval(() => {
+        EventReminderService.processDueReminders().catch((err) =>
+          console.error('Error procesando recordatorios de eventos:', err)
+        );
+      }, 5 * 60 * 1000);
     });
   } catch (error) {
     console.error('❌ Error iniciando el servidor:', error);

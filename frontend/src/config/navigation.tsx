@@ -81,15 +81,15 @@ export const businessNavItems: NavItem[] = [
     name: "Tareas",
     path: MODULE_PATHS.TASKS,
   },
+  {
+    icon: <CalenderIcon />,
+    name: "Calendario",
+    path: MODULE_PATHS.CALENDAR,
+  },
 ];
 
 /** Menú demo TailAdmin — visible solo para administrador */
 export const adminDemoNavItems: NavItem[] = [
-  {
-    icon: <CalenderIcon />,
-    name: "Calendar",
-    path: "/calendar",
-  },
   {
     icon: <UserCircleIcon />,
     name: "User Profile",

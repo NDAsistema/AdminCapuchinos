@@ -1,284 +1,269 @@
-import { useState, useRef, useEffect } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import FullCalendar from "@fullcalendar/react";
 import dayGridPlugin from "@fullcalendar/daygrid";
 import timeGridPlugin from "@fullcalendar/timegrid";
 import interactionPlugin from "@fullcalendar/interaction";
-import { EventInput, DateSelectArg, EventClickArg } from "@fullcalendar/core";
-import { Modal } from "../components/ui/modal";
-import { useModal } from "../hooks/useModal";
+import { DateSelectArg, EventClickArg, DatesSetArg } from "@fullcalendar/core";
 import PageMeta from "../components/common/PageMeta";
+import calendarService, { type Calendar } from "../services/calendarService";
+import eventService, { type CalendarEventInstance } from "../services/eventService";
+import CalendarModal from "../components/calendar/CalendarModal";
+import EventModal from "../components/calendar/EventModal";
+import { usePermissions } from "../hooks/usePermissions";
+import Swal from "sweetalert2";
 
-interface CalendarEvent extends EventInput {
-  extendedProps: {
-    calendar: string;
-  };
-}
+const CalendarPage: React.FC = () => {
+  const { isAdmin, isCommunications } = usePermissions();
+  const canManage = isAdmin || isCommunications;
 
-const Calendar: React.FC = () => {
-  const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(
-    null
-  );
-  const [eventTitle, setEventTitle] = useState("");
-  const [eventStartDate, setEventStartDate] = useState("");
-  const [eventEndDate, setEventEndDate] = useState("");
-  const [eventLevel, setEventLevel] = useState("");
-  const [events, setEvents] = useState<CalendarEvent[]>([]);
+  const [calendars, setCalendars] = useState<Calendar[]>([]);
+  const [selectedCalendarIds, setSelectedCalendarIds] = useState<number[]>([]);
+  const [events, setEvents] = useState<CalendarEventInstance[]>([]);
+  const [dateRange, setDateRange] = useState({ start: "", end: "" });
+
+  const [calendarModalOpen, setCalendarModalOpen] = useState(false);
+  const [editingCalendar, setEditingCalendar] = useState<Calendar | null>(null);
+
+  const [eventModalOpen, setEventModalOpen] = useState(false);
+  const [editingEvent, setEditingEvent] = useState<CalendarEventInstance | null>(null);
+  const [defaultStart, setDefaultStart] = useState("");
+  const [defaultEnd, setDefaultEnd] = useState("");
+
   const calendarRef = useRef<FullCalendar>(null);
-  const { isOpen, openModal, closeModal } = useModal();
 
-  const calendarsEvents = {
-    Danger: "danger",
-    Success: "success",
-    Primary: "primary",
-    Warning: "warning",
-  };
-
-  useEffect(() => {
-    // Initialize with some events
-    setEvents([
-      {
-        id: "1",
-        title: "Event Conf.",
-        start: new Date().toISOString().split("T")[0],
-        extendedProps: { calendar: "Danger" },
-      },
-      {
-        id: "2",
-        title: "Meeting",
-        start: new Date(Date.now() + 86400000).toISOString().split("T")[0],
-        extendedProps: { calendar: "Success" },
-      },
-      {
-        id: "3",
-        title: "Workshop",
-        start: new Date(Date.now() + 172800000).toISOString().split("T")[0],
-        end: new Date(Date.now() + 259200000).toISOString().split("T")[0],
-        extendedProps: { calendar: "Primary" },
-      },
-    ]);
+  const loadCalendars = useCallback(async () => {
+    try {
+      const data = await calendarService.getAll();
+      setCalendars(data);
+      setSelectedCalendarIds((prev) =>
+        prev.length ? prev.filter((id) => data.some((c) => c.id === id)) : data.map((c) => c.id)
+      );
+    } catch (err) {
+      console.error("Error cargando calendarios:", err);
+    }
   }, []);
 
-  const handleDateSelect = (selectInfo: DateSelectArg) => {
-    resetModalFields();
-    setEventStartDate(selectInfo.startStr);
-    setEventEndDate(selectInfo.endStr || selectInfo.startStr);
-    openModal();
-  };
-
-  const handleEventClick = (clickInfo: EventClickArg) => {
-    const event = clickInfo.event;
-    setSelectedEvent(event as unknown as CalendarEvent);
-    setEventTitle(event.title);
-    setEventStartDate(event.start?.toISOString().split("T")[0] || "");
-    setEventEndDate(event.end?.toISOString().split("T")[0] || "");
-    setEventLevel(event.extendedProps.calendar);
-    openModal();
-  };
-
-  const handleAddOrUpdateEvent = () => {
-    if (selectedEvent) {
-      // Update existing event
-      setEvents((prevEvents) =>
-        prevEvents.map((event) =>
-          event.id === selectedEvent.id
-            ? {
-                ...event,
-                title: eventTitle,
-                start: eventStartDate,
-                end: eventEndDate,
-                extendedProps: { calendar: eventLevel },
-              }
-            : event
-        )
-      );
-    } else {
-      // Add new event
-      const newEvent: CalendarEvent = {
-        id: Date.now().toString(),
-        title: eventTitle,
-        start: eventStartDate,
-        end: eventEndDate,
-        allDay: true,
-        extendedProps: { calendar: eventLevel },
-      };
-      setEvents((prevEvents) => [...prevEvents, newEvent]);
+  const loadEvents = useCallback(async () => {
+    if (!dateRange.start || !dateRange.end || selectedCalendarIds.length === 0) {
+      setEvents([]);
+      return;
     }
-    closeModal();
-    resetModalFields();
+    try {
+      const data = await eventService.getInRange(
+        dateRange.start,
+        dateRange.end,
+        selectedCalendarIds
+      );
+      setEvents(data);
+    } catch (err) {
+      console.error("Error cargando eventos:", err);
+    }
+  }, [dateRange, selectedCalendarIds]);
+
+  useEffect(() => {
+    loadCalendars();
+  }, [loadCalendars]);
+
+  useEffect(() => {
+    loadEvents();
+  }, [loadEvents]);
+
+  const handleDatesSet = (info: DatesSetArg) => {
+    setDateRange({
+      start: info.startStr.slice(0, 10),
+      end: info.endStr.slice(0, 10),
+    });
   };
 
-  const resetModalFields = () => {
-    setEventTitle("");
-    setEventStartDate("");
-    setEventEndDate("");
-    setEventLevel("");
-    setSelectedEvent(null);
+  const toggleCalendar = (id: number) => {
+    setSelectedCalendarIds((prev) =>
+      prev.includes(id) ? prev.filter((c) => c !== id) : [...prev, id]
+    );
   };
+
+  const promptCreateCalendar = async () => {
+    const result = await Swal.fire({
+      title: "Sin calendarios",
+      text: "No tienes calendarios creados. Debes crear uno antes de agregar eventos.",
+      icon: "info",
+      showCancelButton: true,
+      confirmButtonText: "Crear calendario",
+      cancelButtonText: "Cancelar",
+      confirmButtonColor: "#465fff",
+      cancelButtonColor: "#6b7280",
+    });
+
+    if (result.isConfirmed) {
+      setEditingCalendar(null);
+      setCalendarModalOpen(true);
+    }
+  };
+
+  const openNewEvent = async (start?: string, end?: string) => {
+    if (!canManage) return;
+
+    const manageable = calendars.filter((c) => c.canManage);
+    if (manageable.length === 0) {
+      calendarRef.current?.getApi().unselect();
+      await promptCreateCalendar();
+      return;
+    }
+
+    setEditingEvent(null);
+    setDefaultStart(start ?? "");
+    setDefaultEnd(end ?? "");
+    setEventModalOpen(true);
+  };
+
+  const handleDateSelect = (info: DateSelectArg) => {
+    openNewEvent(info.startStr, info.endStr || info.startStr);
+  };
+
+  const handleEventClick = (info: EventClickArg) => {
+    const props = info.event.extendedProps;
+    const instance: CalendarEventInstance = {
+      id: info.event.id,
+      eventId: props.eventId,
+      calendarId: props.calendarId,
+      title: info.event.title,
+      description: props.description,
+      start: info.event.startStr,
+      end: info.event.endStr ?? info.event.startStr,
+      allDay: info.event.allDay,
+      color: info.event.backgroundColor ?? "#465fff",
+      isRecurring: props.isRecurring,
+      isException: props.isException,
+      originalStartAt: props.originalStartAt,
+    };
+    if (canManage && calendars.find((c) => c.id === instance.calendarId)?.canManage) {
+      setEditingEvent(instance);
+      setEventModalOpen(true);
+    }
+  };
+
+  const fcEvents = events.map((e) => ({
+    id: e.id,
+    title: e.title,
+    start: e.start,
+    end: e.end,
+    allDay: e.allDay,
+    backgroundColor: e.color,
+    borderColor: e.color,
+    extendedProps: {
+      eventId: e.eventId,
+      calendarId: e.calendarId,
+      description: e.description,
+      isRecurring: e.isRecurring,
+      isException: e.isException,
+      originalStartAt: e.originalStartAt,
+    },
+  }));
+
+  const manageableCalendars = calendars.filter((c) => c.canManage);
 
   return (
     <>
-      <PageMeta
-        title="React.js Calendar Dashboard | TailAdmin - Next.js Admin Dashboard Template"
-        description="This is React.js Calendar Dashboard page for TailAdmin - React.js Tailwind CSS Admin Dashboard Template"
-      />
-      <div className="rounded-2xl border  border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03]">
-        <div className="custom-calendar">
-          <FullCalendar
-            ref={calendarRef}
-            plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
-            initialView="dayGridMonth"
-            headerToolbar={{
-              left: "prev,next addEventButton",
-              center: "title",
-              right: "dayGridMonth,timeGridWeek,timeGridDay",
-            }}
-            events={events}
-            selectable={true}
-            select={handleDateSelect}
-            eventClick={handleEventClick}
-            eventContent={renderEventContent}
-            customButtons={{
-              addEventButton: {
-                text: "Add Event +",
-                click: openModal,
-              },
-            }}
-          />
-        </div>
-        <Modal
-          isOpen={isOpen}
-          onClose={closeModal}
-          className="max-w-[700px] p-6 lg:p-10"
-        >
-          <div className="flex flex-col px-2 overflow-y-auto custom-scrollbar">
-            <div>
-              <h5 className="mb-2 font-semibold text-gray-800 modal-title text-theme-xl dark:text-white/90 lg:text-2xl">
-                {selectedEvent ? "Edit Event" : "Add Event"}
-              </h5>
-              <p className="text-sm text-gray-500 dark:text-gray-400">
-                Plan your next big moment: schedule or edit an event to stay on
-                track
-              </p>
-            </div>
-            <div className="mt-8">
-              <div>
-                <div>
-                  <label className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">
-                    Event Title
-                  </label>
-                  <input
-                    id="event-title"
-                    type="text"
-                    value={eventTitle}
-                    onChange={(e) => setEventTitle(e.target.value)}
-                    className="dark:bg-dark-900 h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 shadow-theme-xs placeholder:text-gray-400 focus:border-brand-300 focus:outline-hidden focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30 dark:focus:border-brand-800"
-                  />
-                </div>
-              </div>
-              <div className="mt-6">
-                <label className="block mb-4 text-sm font-medium text-gray-700 dark:text-gray-400">
-                  Event Color
-                </label>
-                <div className="flex flex-wrap items-center gap-4 sm:gap-5">
-                  {Object.entries(calendarsEvents).map(([key, value]) => (
-                    <div key={key} className="n-chk">
-                      <div
-                        className={`form-check form-check-${value} form-check-inline`}
-                      >
-                        <label
-                          className="flex items-center text-sm text-gray-700 form-check-label dark:text-gray-400"
-                          htmlFor={`modal${key}`}
-                        >
-                          <span className="relative">
-                            <input
-                              className="sr-only form-check-input"
-                              type="radio"
-                              name="event-level"
-                              value={key}
-                              id={`modal${key}`}
-                              checked={eventLevel === key}
-                              onChange={() => setEventLevel(key)}
-                            />
-                            <span className="flex items-center justify-center w-5 h-5 mr-2 border border-gray-300 rounded-full box dark:border-gray-700">
-                              <span
-                                className={`h-2 w-2 rounded-full bg-white ${
-                                  eventLevel === key ? "block" : "hidden"
-                                }`}
-                              ></span>
-                            </span>
-                          </span>
-                          {key}
-                        </label>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
+      <PageMeta title="Calendario | AdminCapuchinos" description="Calendarios y eventos" />
 
-              <div className="mt-6">
-                <label className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">
-                  Enter Start Date
-                </label>
-                <div className="relative">
-                  <input
-                    id="event-start-date"
-                    type="date"
-                    value={eventStartDate}
-                    onChange={(e) => setEventStartDate(e.target.value)}
-                    className="dark:bg-dark-900 h-11 w-full appearance-none rounded-lg border border-gray-300 bg-transparent bg-none px-4 py-2.5 pl-4 pr-11 text-sm text-gray-800 shadow-theme-xs placeholder:text-gray-400 focus:border-brand-300 focus:outline-hidden focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30 dark:focus:border-brand-800"
-                  />
-                </div>
-              </div>
-
-              <div className="mt-6">
-                <label className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">
-                  Enter End Date
-                </label>
-                <div className="relative">
-                  <input
-                    id="event-end-date"
-                    type="date"
-                    value={eventEndDate}
-                    onChange={(e) => setEventEndDate(e.target.value)}
-                    className="dark:bg-dark-900 h-11 w-full appearance-none rounded-lg border border-gray-300 bg-transparent bg-none px-4 py-2.5 pl-4 pr-11 text-sm text-gray-800 shadow-theme-xs placeholder:text-gray-400 focus:border-brand-300 focus:outline-hidden focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30 dark:focus:border-brand-800"
-                  />
-                </div>
-              </div>
-            </div>
-            <div className="flex items-center gap-3 mt-6 modal-footer sm:justify-end">
+      <div className="flex flex-col gap-4 xl:flex-row">
+        <aside className="w-full shrink-0 rounded-2xl border border-gray-200 bg-white p-4 dark:border-gray-800 dark:bg-white/[0.03] xl:w-64">
+          <div className="mb-4 flex items-center justify-between">
+            <h3 className="font-semibold text-gray-800 dark:text-white">Calendarios</h3>
+            {canManage && (
               <button
-                onClick={closeModal}
                 type="button"
-                className="flex w-full justify-center rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-white/[0.03] sm:w-auto"
+                onClick={() => { setEditingCalendar(null); setCalendarModalOpen(true); }}
+                className="rounded-lg bg-brand-500 px-2 py-1 text-xs text-white hover:bg-brand-600"
               >
-                Close
+                + Nuevo
               </button>
-              <button
-                onClick={handleAddOrUpdateEvent}
-                type="button"
-                className="btn btn-success btn-update-event flex w-full justify-center rounded-lg bg-brand-500 px-4 py-2.5 text-sm font-medium text-white hover:bg-brand-600 sm:w-auto"
-              >
-                {selectedEvent ? "Update Changes" : "Add Event"}
-              </button>
-            </div>
+            )}
           </div>
-        </Modal>
+
+          <ul className="space-y-2">
+            {calendars.map((cal) => (
+              <li key={cal.id} className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={selectedCalendarIds.includes(cal.id)}
+                  onChange={() => toggleCalendar(cal.id)}
+                  className="rounded"
+                />
+                <span
+                  className="h-3 w-3 shrink-0 rounded-full"
+                  style={{ backgroundColor: cal.color ?? "#465fff" }}
+                />
+                <span className="flex-1 truncate text-sm text-gray-700 dark:text-gray-300">
+                  {cal.name}
+                </span>
+                {cal.canManage && (
+                  <button
+                    type="button"
+                    onClick={() => { setEditingCalendar(cal); setCalendarModalOpen(true); }}
+                    className="text-xs text-brand-500 hover:underline"
+                  >
+                    Editar
+                  </button>
+                )}
+              </li>
+            ))}
+            {calendars.length === 0 && (
+              <p className="text-sm text-gray-500">No hay calendarios visibles</p>
+            )}
+          </ul>
+        </aside>
+
+        <div className="flex-1 rounded-2xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03]">
+          <div className="custom-calendar">
+            <FullCalendar
+              ref={calendarRef}
+              plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
+              initialView="dayGridMonth"
+              locale="es"
+              headerToolbar={{
+                left: "prev,next today",
+                center: "title",
+                right: canManage ? "dayGridMonth,timeGridWeek,timeGridDay addEventButton" : "dayGridMonth,timeGridWeek,timeGridDay",
+              }}
+              customButtons={
+                canManage
+                  ? {
+                      addEventButton: {
+                        text: "Nuevo evento",
+                        click: () => openNewEvent(),
+                      },
+                    }
+                  : undefined
+              }
+              events={fcEvents}
+              selectable={canManage}
+              select={handleDateSelect}
+              eventClick={handleEventClick}
+              datesSet={handleDatesSet}
+              height="auto"
+            />
+          </div>
+        </div>
       </div>
+
+      <CalendarModal
+        isOpen={calendarModalOpen}
+        calendar={editingCalendar}
+        onClose={() => setCalendarModalOpen(false)}
+        onSuccess={loadCalendars}
+      />
+
+      <EventModal
+        isOpen={eventModalOpen}
+        event={editingEvent}
+        calendars={manageableCalendars.length ? manageableCalendars : calendars}
+        defaultStart={defaultStart}
+        defaultEnd={defaultEnd}
+        onClose={() => setEventModalOpen(false)}
+        onSuccess={loadEvents}
+      />
     </>
   );
 };
 
-const renderEventContent = (eventInfo: any) => {
-  const colorClass = `fc-bg-${eventInfo.event.extendedProps.calendar.toLowerCase()}`;
-  return (
-    <div
-      className={`event-fc-color flex fc-event-main ${colorClass} p-1 rounded-sm`}
-    >
-      <div className="fc-daygrid-event-dot"></div>
-      <div className="fc-event-time">{eventInfo.timeText}</div>
-      <div className="fc-event-title">{eventInfo.event.title}</div>
-    </div>
-  );
-};
-
-export default Calendar;
+export default CalendarPage;

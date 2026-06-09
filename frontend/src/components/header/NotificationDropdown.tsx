@@ -11,6 +11,8 @@ const TYPE_LABELS: Record<string, string> = {
   report_approved: "Informe",
   report_rejected: "Informe",
   newspaper_published: "Noticia",
+  event_reminder: "Evento",
+  event_created: "Evento",
 };
 
 function formatTimeAgo(dateStr: string): string {
@@ -26,6 +28,7 @@ function formatTimeAgo(dateStr: string): string {
 
 function getNotificationLink(n: Notification): string {
   if (n.type === "newspaper_published") return "/Noticias";
+  if (n.type === "event_reminder" || n.type === "event_created") return "/Calendario";
   return "/Tareas";
 }
 
@@ -196,13 +199,22 @@ export default function NotificationDropdown() {
           )}
         </ul>
 
-        <Link
-          to="/Tareas"
-          onClick={closeDropdown}
-          className="block px-4 py-2 mt-3 text-sm font-medium text-center text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-100 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-gray-700"
-        >
-          Ver módulo de tareas
-        </Link>
+        <div className="mt-3 flex flex-col gap-2">
+          <Link
+            to="/Calendario"
+            onClick={closeDropdown}
+            className="block px-4 py-2 text-sm font-medium text-center text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-100 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-gray-700"
+          >
+            Ver calendario
+          </Link>
+          <Link
+            to="/Tareas"
+            onClick={closeDropdown}
+            className="block px-4 py-2 text-sm font-medium text-center text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-100 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-gray-700"
+          >
+            Ver módulo de tareas
+          </Link>
+        </div>
       </Dropdown>
     </div>
   );
