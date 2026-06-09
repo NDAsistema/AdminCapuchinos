@@ -6,6 +6,7 @@ import 'froala-editor/css/froala_style.min.css';
 import 'froala-editor/js/plugins.pkgd.min.js'; 
 import FroalaEditorComponent from 'react-froala-wysiwyg';
 import { useAuth } from '../UserProfile/AuthProvider';
+import { usePermissions } from '../../hooks/usePermissions';
 import brotherService from '../../services/brotherService';
 import GroupService from '../../services/GroupService';
 import TaskService from '../../services/taskServices';
@@ -16,10 +17,13 @@ interface Props {
     onClose: () => void;
     onSuccess: () => void;
     initialData?: any;
+    isLeaderMode?: boolean;
 }
 
-export const TaskModal: React.FC<Props> = ({ isOpen, onClose, onSuccess, initialData }) => {
+export const TaskModal: React.FC<Props> = ({ isOpen, onClose, onSuccess, initialData, isLeaderMode }) => {
     const { user } = useAuth();
+    const { isGroupLeader } = usePermissions();
+    const leaderMode = isLeaderMode ?? isGroupLeader;
     
     // Campos Básicos
     const [title, setTitle] = useState('');
@@ -85,14 +89,20 @@ export const TaskModal: React.FC<Props> = ({ isOpen, onClose, onSuccess, initial
                 if (user.type_user === 1) { 
                     data = typeAssing === '1' ? await brotherService.getAllBrothers() : (await GroupService.getAllGroups())[0] || [];
                 } else if (user.type_user === 3) {
-                    data = typeAssing === '1' ? await brotherService.findBrothersForCommunicationUser() : await GroupService.findGroupsForCommunicationUser();
+                    data = typeAssing === '1'
+                        ? await brotherService.findUsersInCommsScope()
+                        : await GroupService.findGroupsForCommunicationUser();
+                } else if (leaderMode) {
+                    data = typeAssing === '1'
+                        ? await brotherService.findMembersInLedGroups()
+                        : await GroupService.findGroupsForGroupLeader();
                 } else if (user.type_user === 4) {
                     data = await brotherService.findBrothersForGuardian(); 
                     setTypeAssing('1'); 
                 }
 
                 setOptions(data.map(item => ({ 
-                    value: String(item.id), 
+                    value: String(item.brotherId ?? item.id), 
                     label: item.name_group || item.name_brother || item.name || 'Sin nombre'
                 })));
             } catch (error) {
@@ -100,7 +110,7 @@ export const TaskModal: React.FC<Props> = ({ isOpen, onClose, onSuccess, initial
             }
         };
         loadOptions();
-    }, [typeAssing, user, isOpen]);
+    }, [typeAssing, user, isOpen, leaderMode]);
 
     const handleSave = async () => {
         setTouched(true);
@@ -141,7 +151,9 @@ export const TaskModal: React.FC<Props> = ({ isOpen, onClose, onSuccess, initial
 
     if (!isOpen) return null;
 
-    const canChooseAssignType = user?.type_user === 1 || user?.type_user === 3;
+    const canChooseAssignType =
+        user?.type_user === 1 || user?.type_user === 3 || leaderMode;
+    const isLeaderOnlyAssign = leaderMode && user?.type_user === 2;
 
     return (
         <div className="fixed modal-capuchinos inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
@@ -196,9 +208,19 @@ export const TaskModal: React.FC<Props> = ({ isOpen, onClose, onSuccess, initial
                                         value={typeAssing}
                                         onChange={e => { setTypeAssing(e.target.value); setSelectedOptions([]); }}
                                     >
-                                        <option value="0">Todos los Usuarios (Global)</option>
-                                        <option value="1">Personas Específicas</option>
-                                        <option value="2">Grupos Seleccionados</option>
+                                        {!isLeaderOnlyAssign && (
+                                            <option value="0">Todos los Usuarios (Global)</option>
+                                        )}
+                                        <option value="1">
+                                            {isLeaderOnlyAssign
+                                                ? "Personas individuales"
+                                                : "Personas Específicas"}
+                                        </option>
+                                        <option value="2">
+                                            {isLeaderOnlyAssign
+                                                ? "Todo el grupo"
+                                                : "Grupos Seleccionados"}
+                                        </option>
                                     </select>
                                 </div>
                             )}
@@ -206,12 +228,32 @@ export const TaskModal: React.FC<Props> = ({ isOpen, onClose, onSuccess, initial
                             {typeAssing !== '0' && (
                                 <div>
                                     <label className="block text-sm font-medium dark:text-gray-200 mb-1">
-                                        {typeAssing === '1' ? 'Seleccionar Personas *' : 'Seleccionar Grupos *'}
+                                        {typeAssing === '1'
+                                            ? 'Seleccionar Personas *'
+                                            : isLeaderOnlyAssign
+                                              ? 'Seleccionar grupo *'
+                                              : 'Seleccionar Grupos *'}
                                     </label>
                                     <Select
-                                        isMulti placeholder="Buscar..." options={options} styles={customSelectStyles}
-                                        value={selectedOptions} onChange={(val: any) => setSelectedOptions(val || [])}
-                                        isClearable closeMenuOnSelect={false} className="dark:text-gray-800"
+                                        isMulti={!(isLeaderOnlyAssign && typeAssing === '2')}
+                                        placeholder="Buscar..."
+                                        options={options}
+                                        styles={customSelectStyles}
+                                        value={
+                                            isLeaderOnlyAssign && typeAssing === '2'
+                                                ? selectedOptions[0] ?? null
+                                                : selectedOptions
+                                        }
+                                        onChange={(val: any) => {
+                                            if (isLeaderOnlyAssign && typeAssing === '2') {
+                                                setSelectedOptions(val ? [val] : []);
+                                            } else {
+                                                setSelectedOptions(val || []);
+                                            }
+                                        }}
+                                        isClearable
+                                        closeMenuOnSelect={!(isLeaderOnlyAssign && typeAssing === '2')}
+                                        className="dark:text-gray-800"
                                     />
                                 </div>
                             )}

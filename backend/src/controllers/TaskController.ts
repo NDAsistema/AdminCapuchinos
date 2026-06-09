@@ -20,11 +20,12 @@ export class TaskController {
     static async getAllTask(req: Request, res: Response) {
         try {
             const user = AuthHelper.getAuthenticatedUser(req);
-            const { view, groupId, userId } = req.query;
+            const { view, groupId, userId, brotherId } = req.query;
             const tasks = await TaskService.listTasksForUser(user, {
                 view: view as string | undefined,
                 groupId: groupId as string | undefined,
                 userId: userId as string | undefined,
+                brotherId: brotherId as string | undefined,
             });
             res.json({ success: true, data: tasks });
         } catch (error) {

@@ -182,6 +182,16 @@ class GroupService {
     }
   }
 
+  static async findGroupsForGroupLeader() {
+    try {
+      const response = await api.get('/group/forGroupLeader');
+      return response.data.data || [];
+    } catch (error) {
+      console.error('Error al obtener grupos del líder:', error);
+      return [];
+    }
+  }
+
 }
 
 export default GroupService;

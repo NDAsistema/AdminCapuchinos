@@ -164,10 +164,46 @@ export class BrotherController {
             if (!brotherId) {
                 return res.json({ success: true, data: [], count: 0 });
             }
-            const users = await BrotherModel.findUsersInCommsScope(Number(brotherId));
-            res.json({ success: true, data: users, count: users.length });
+            const groupId = req.query.groupId ? Number(req.query.groupId) : undefined;
+            const members = await BrotherModel.findUsersInCommsScope(
+                Number(brotherId),
+                groupId && !Number.isNaN(groupId) ? groupId : undefined
+            );
+            res.json({ success: true, data: members, count: members.length });
         } catch (error) {
             console.error('Error getting users in comms scope:', error);
+            res.status(500).json({ success: false, message: 'Error interno del servidor' });
+        }
+    }
+
+    static async findStandardUsersInGroup(req: Request, res: Response) {
+        try {
+            const groupId = Number(req.query.groupId);
+            if (!groupId || Number.isNaN(groupId)) {
+                return res.status(400).json({ success: false, message: 'groupId requerido' });
+            }
+            const members = await BrotherModel.findStandardUsersInGroup(groupId);
+            res.json({ success: true, data: members, count: members.length });
+        } catch (error) {
+            console.error('Error getting users in group:', error);
+            res.status(500).json({ success: false, message: 'Error interno del servidor' });
+        }
+    }
+
+    static async findMembersInLedGroups(req: AuthRequest, res: Response) {
+        try {
+            const brotherId = req.user?.id_brother;
+            if (!brotherId) {
+                return res.json({ success: true, data: [], count: 0 });
+            }
+            const groupId = req.query.groupId ? Number(req.query.groupId) : undefined;
+            const members = await BrotherModel.findMembersInLedGroups(
+                Number(brotherId),
+                groupId && !Number.isNaN(groupId) ? groupId : undefined
+            );
+            res.json({ success: true, data: members, count: members.length });
+        } catch (error) {
+            console.error('Error getting members in led groups:', error);
             res.status(500).json({ success: false, message: 'Error interno del servidor' });
         }
     }

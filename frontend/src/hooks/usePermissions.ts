@@ -21,11 +21,17 @@ export function usePermissions() {
     [role, user?.type_user]
   );
 
+  const isGroupLeader = useMemo(
+    () => Boolean(user?.is_group_leader),
+    [user?.is_group_leader]
+  );
+
   return {
     role,
     isAdmin: role === USER_ROLES.ADMIN,
     isStandard: role === USER_ROLES.STANDARD,
     isCommunications: role === USER_ROLES.COMMUNICATIONS,
+    isGroupLeader,
     canAccess,
     roleLabel: getRoleLabel(user?.type_user),
   };

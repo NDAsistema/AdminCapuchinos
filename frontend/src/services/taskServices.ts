@@ -15,7 +15,7 @@ api.interceptors.request.use(
   (error) => Promise.reject(error)
 );
 
-export type TaskListView = 'reportes' | 'gestion';
+export type TaskListView = 'reportes' | 'gestion' | 'asignadas';
 export type ReviewStatus = 'pending' | 'approved' | 'rejected';
 
 export interface Task {
@@ -49,6 +49,7 @@ export interface TaskListParams {
   view?: TaskListView;
   groupId?: string;
   userId?: string;
+  brotherId?: string;
 }
 
 class TaskService {

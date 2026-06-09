@@ -5,22 +5,29 @@ import TaskService from "../../services/taskServices";
 interface Props {
   isOpen: boolean;
   reportId: number | null;
+  reviewMode?: boolean;
   onClose: () => void;
   onSuccess: () => void;
 }
 
-export function TaskReviewModal({ isOpen, reportId, onClose, onSuccess }: Props) {
+export function TaskReviewModal({ isOpen, reportId, reviewMode = false, onClose, onSuccess }: Props) {
   const [report, setReport] = useState<any>(null);
   const [comment, setComment] = useState("");
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
 
   useEffect(() => {
     if (!isOpen || !reportId) return;
     setLoading(true);
+    setError("");
+    setReport(null);
     TaskService.getTaskDetail(reportId)
       .then((data) => {
         setReport(data);
         setComment("");
+      })
+      .catch((err) => {
+        setError(err.response?.data?.message || "No se pudo cargar el informe");
       })
       .finally(() => setLoading(false));
   }, [isOpen, reportId]);
@@ -60,7 +67,8 @@ export function TaskReviewModal({ isOpen, reportId, onClose, onSuccess }: Props)
             <p className="text-xs font-bold text-purple-600 uppercase">Revisión de informe</p>
             <h2 className="text-xl font-bold dark:text-white">{report?.title}</h2>
             <p className="text-sm text-gray-500">
-              De: {report?.userName} · Tarea: {report?.parent_title || report?.parent?.title}
+              De: {report?.userName || "—"} · Tarea:{" "}
+              {report?.parent_title || report?.parent?.title || "—"}
             </p>
           </div>
           <button type="button" onClick={onClose} className="text-2xl text-gray-400">
@@ -70,14 +78,16 @@ export function TaskReviewModal({ isOpen, reportId, onClose, onSuccess }: Props)
 
         {loading ? (
           <p className="text-center py-10">Cargando...</p>
+        ) : error ? (
+          <p className="text-center py-10 text-red-500">{error}</p>
         ) : report ? (
           <>
             <div
               className="prose prose-sm max-w-none dark:prose-invert border rounded-xl p-4 mb-4"
-              dangerouslySetInnerHTML={{ __html: report.content }}
+              dangerouslySetInnerHTML={{ __html: report.content || "" }}
             />
 
-            {report.review_status === "pending" ? (
+            {report.review_status === "pending" && reviewMode ? (
               <>
                 <label className="block text-sm font-medium mb-1 dark:text-gray-200">
                   Comentario (obligatorio si rechazas)
@@ -110,7 +120,7 @@ export function TaskReviewModal({ isOpen, reportId, onClose, onSuccess }: Props)
                   </button>
                 </div>
               </>
-            ) : (
+            ) : report.review_status && report.review_status !== "pending" ? (
               <div className="p-4 rounded-xl bg-gray-50 dark:bg-gray-900/50">
                 <p className="font-bold">
                   Estado: {report.review_status === "approved" ? "Aprobado" : "Rechazado"}
@@ -118,6 +128,12 @@ export function TaskReviewModal({ isOpen, reportId, onClose, onSuccess }: Props)
                 {report.review_comment && (
                   <p className="text-sm mt-2 text-gray-600">{report.review_comment}</p>
                 )}
+              </div>
+            ) : (
+              <div className="flex justify-end mt-4">
+                <button type="button" onClick={onClose} className="px-4 py-2 text-gray-500">
+                  Cerrar
+                </button>
               </div>
             )}
           </>

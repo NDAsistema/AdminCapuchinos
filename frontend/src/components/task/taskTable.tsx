@@ -8,6 +8,7 @@ interface TableProps {
   onSubmitReport?: (task: any) => void;
   onReview?: (reportId: number) => void;
   readOnly?: boolean;
+  emptyMessage?: string;
 }
 
 function ReviewBadge({ status, hasReport }: { status?: string | null; hasReport?: boolean }) {
@@ -57,6 +58,7 @@ export function TaskTable({
   onSubmitReport,
   onReview,
   readOnly,
+  emptyMessage,
 }: TableProps) {
   const isAssignedView = view === "assigned";
   const isReportsView = view === "reportes";
@@ -135,7 +137,18 @@ export function TaskTable({
 
                 <td className="px-6 py-4 text-right rounded-r-2xl">
                   <div className="flex justify-end gap-1">
-                    {onView && (
+                    {isReportsView && onView && (
+                      <button
+                        type="button"
+                        title="Ver informe"
+                        onClick={() => onView(task)}
+                        className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-xl"
+                      >
+                        <EyeIcon />
+                      </button>
+                    )}
+
+                    {isAssignedView && onView && (
                       <button
                         type="button"
                         title="Ver"
@@ -160,22 +173,11 @@ export function TaskTable({
                     {isReportsView && task.review_status === "pending" && onReview && (
                       <button
                         type="button"
-                        title="Revisar"
+                        title="Revisar / Aprobar"
                         onClick={() => onReview(task.id)}
                         className="p-2 text-gray-400 hover:text-purple-600 hover:bg-purple-50 rounded-xl"
                       >
                         <CheckIcon />
-                      </button>
-                    )}
-
-                    {isReportsView && task.review_status !== "pending" && onReview && (
-                      <button
-                        type="button"
-                        title="Ver revisión"
-                        onClick={() => onReview(task.id)}
-                        className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-xl"
-                      >
-                        <EyeIcon />
                       </button>
                     )}
 
@@ -195,9 +197,10 @@ export function TaskTable({
           ) : (
             <tr>
               <td colSpan={5} className="py-20 text-center text-gray-400 italic">
-                {isAssignedView
-                  ? "No tienes tareas asignadas."
-                  : "No se encontraron registros."}
+                {emptyMessage ||
+                  (isAssignedView
+                    ? "No tienes tareas asignadas."
+                    : "No se encontraron registros.")}
               </td>
             </tr>
           )}

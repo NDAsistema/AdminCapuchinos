@@ -1,5 +1,6 @@
 import { pool } from '../config/database';
 import { TaskModel, Task, TaskFilters } from '../models/TaskModel';
+import { BrotherModel } from '../models/BrotherModel';
 import { TaskAssignmentModel } from '../models/TaskAssignmentModel';
 import { AttachmentController } from '../controllers/AttachmentController';
 import { NotificationService } from './NotificationService';
@@ -10,6 +11,7 @@ interface ListQuery {
     view?: string;
     groupId?: string;
     userId?: string;
+    brotherId?: string;
 }
 
 interface AuthUser {
@@ -18,12 +20,15 @@ interface AuthUser {
     type_user: number;
 }
 
+interface TaskCreator extends AuthUser {}
+
 export class TaskService {
     static async listTasksForUser(user: AuthUser, query: ListQuery = {}) {
         const view = (query.view as TaskListView) || 'default';
         const filters: TaskFilters = {
             groupId: query.groupId || undefined,
             userId: query.userId || undefined,
+            brotherId: query.brotherId || undefined,
         };
         const role = Number(user.type_user);
 
@@ -51,6 +56,18 @@ export class TaskService {
             return TaskModel.getCommsUserReports(user.id_brother, filters);
         }
 
+        if (role === 2 && user.id_brother) {
+            const isLeader = await TaskModel.isGroupLeader(user.id_brother);
+            if (isLeader) {
+                if (view === 'reportes') {
+                    return TaskModel.getLeaderUserReports(user.id_brother, filters);
+                }
+                if (view === 'gestion') {
+                    return TaskModel.getLeaderManagementTasks(user.id, filters);
+                }
+            }
+        }
+
         return TaskModel.getAssignedMasterTasks(user.id, user.id_brother);
     }
 
@@ -65,7 +82,12 @@ export class TaskService {
                 user.id_brother,
                 user.type_user
             );
-            if (!canReview && task.created_by !== user.id && user.type_user !== 1) {
+            if (
+                !canReview &&
+                task.created_by !== user.id &&
+                Number(user.type_user) !== 1 &&
+                Number(user.type_user) !== 3
+            ) {
                 throw new Error('No autorizado');
             }
             const parent = await TaskModel.findById(task.parent_task_id);
@@ -199,7 +221,24 @@ export class TaskService {
         return { reviewStatus };
     }
 
-    static async createAndAssignTask(taskData: any, creator: { id: number; type_user: number }) {
+    static async createAndAssignTask(taskData: any, creator: TaskCreator) {
+        const role = Number(creator.type_user);
+        const assignedType = parseInt(taskData.assigned_type);
+        const assignedIds = Array.isArray(taskData.assigned_ids)
+            ? taskData.assigned_ids.map((id: number) => Number(id))
+            : [];
+
+        if (role === 2) {
+            if (!creator.id_brother || !(await TaskModel.isGroupLeader(creator.id_brother))) {
+                throw new Error('No autorizado para crear tareas');
+            }
+            await TaskModel.validateLeaderAssignments(
+                creator.id_brother,
+                assignedType,
+                assignedIds
+            );
+        }
+
         const connection = await pool.getConnection();
         try {
             await connection.beginTransaction();
@@ -219,24 +258,29 @@ export class TaskService {
             const taskId = await TaskModel.create(newTask, connection);
             await AttachmentController.extractAndBindImages(taskId, taskData.content);
             let assignmentsData: any[][] = [];
-            const assignedType = parseInt(taskData.assigned_type);
+            let notifyType = assignedType;
+            let notifyIds = assignedIds;
 
             if (assignedType === 0) {
                 assignmentsData.push([taskId, 0, null]);
-            } else if (Array.isArray(taskData.assigned_ids)) {
-                assignmentsData = taskData.assigned_ids.map((id: number) => [taskId, assignedType, id]);
+            } else if (assignedType === 2 && assignedIds.length > 0) {
+                const brotherIds = await BrotherModel.getBrotherIdsByGroupIds(
+                    assignedIds,
+                    creator.id_brother ?? undefined
+                );
+                if (brotherIds.length === 0) {
+                    throw new Error('El grupo seleccionado no tiene miembros asignables');
+                }
+                assignmentsData = brotherIds.map((brotherId) => [taskId, 1, brotherId]);
+                notifyType = 1;
+                notifyIds = brotherIds;
+            } else if (assignedIds.length > 0) {
+                assignmentsData = assignedIds.map((id: number) => [taskId, assignedType, id]);
             }
 
             if (assignmentsData.length > 0) {
                 await TaskAssignmentModel.createMultiple(assignmentsData, connection);
             }
-
-            const assignedIds =
-                assignedType === 0
-                    ? []
-                    : Array.isArray(taskData.assigned_ids)
-                      ? taskData.assigned_ids.map((id: number) => Number(id))
-                      : [];
 
             const [creatorRows]: any = await connection.execute(
                 `SELECT b.name AS name_brother FROM users u
@@ -248,8 +292,8 @@ export class TaskService {
             await NotificationService.notifyTaskAssigned({
                 taskId,
                 title: taskData.title,
-                assignedType,
-                assignedIds,
+                assignedType: notifyType,
+                assignedIds: notifyIds,
                 creatorUserId: creator.id,
                 creatorName,
                 connection,

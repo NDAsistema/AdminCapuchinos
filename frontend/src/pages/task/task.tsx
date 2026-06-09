@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { useAuth } from "../../components/UserProfile/AuthProvider";
 import { TaskFilters } from "../../components/task/TaskFilters";
 import { TaskTable } from "../../components/task/tasktable";
@@ -8,14 +8,16 @@ import { TaskViewModal } from "../../components/task/TaskViewModal";
 import { TaskReportModal } from "../../components/task/TaskReportModal";
 import { TaskReviewModal } from "../../components/task/TaskReviewModal";
 import TaskService, { type TaskListView } from "../../services/taskServices";
+import GroupService from "../../services/GroupService";
 import { usePermissions } from "../../hooks/usePermissions";
 
 export default function Tasks() {
     const { user } = useAuth();
-    const { isAdmin, isCommunications, isStandard } = usePermissions();
+    const { isAdmin, isCommunications, isStandard, isGroupLeader } = usePermissions();
+    const [leaderWorkspace, setLeaderWorkspace] = useState(isGroupLeader);
 
     const [activeTab, setActiveTab] = useState<TaskListView>("reportes");
-    const [filters, setFilters] = useState({ groupId: "", userId: "" });
+    const [filters, setFilters] = useState({ groupId: "", userId: "", brotherId: "" });
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [selectedTask, setSelectedTask] = useState<any>(null);
     const [refreshKey, setRefreshKey] = useState(0);
@@ -25,20 +27,48 @@ export default function Tasks() {
     const [viewTaskId, setViewTaskId] = useState<number | null>(null);
     const [reportParentTask, setReportParentTask] = useState<any>(null);
     const [reviewReportId, setReviewReportId] = useState<number | null>(null);
+    const [reviewMode, setReviewMode] = useState(false);
+    const [searchQuery, setSearchQuery] = useState("");
 
-    const showWorkspaceTabs = isAdmin || isCommunications;
+    useEffect(() => {
+        if (isGroupLeader) {
+            setLeaderWorkspace(true);
+            return;
+        }
+        if (!isStandard) {
+            setLeaderWorkspace(false);
+            return;
+        }
+        GroupService.findGroupsForGroupLeader()
+            .then((groups) => {
+                const isLeader = Array.isArray(groups) && groups.length > 0;
+                setLeaderWorkspace(isLeader);
+                if (isLeader) setActiveTab("asignadas");
+            })
+            .catch(() => setLeaderWorkspace(false));
+    }, [isGroupLeader, isStandard]);
+
+    const showWorkspaceTabs = isAdmin || isCommunications || leaderWorkspace;
     const showFilters = showWorkspaceTabs && activeTab === "reportes";
-    const showCreateButton = (isAdmin || isCommunications) && activeTab === "gestion";
+    const showCreateButton =
+        (isAdmin || isCommunications || leaderWorkspace) && activeTab === "gestion";
+    const showAssignedSearch = isStandard && (!leaderWorkspace || activeTab === "asignadas");
 
     const loadTasks = useCallback(async () => {
         setLoading(true);
         try {
-            const params: { view?: TaskListView; groupId?: string; userId?: string } = {};
-            if (showWorkspaceTabs) {
+            const params: {
+                view?: TaskListView;
+                groupId?: string;
+                userId?: string;
+                brotherId?: string;
+            } = {};
+            if (showWorkspaceTabs && activeTab !== "asignadas") {
                 params.view = activeTab;
                 if (activeTab === "reportes") {
-                    params.groupId = filters.groupId;
-                    params.userId = filters.userId;
+                    if (filters.groupId) params.groupId = filters.groupId;
+                    if (filters.userId) params.userId = filters.userId;
+                    if (filters.brotherId) params.brotherId = filters.brotherId;
                 }
             }
             const response = await TaskService.getAllTask(params);
@@ -72,11 +102,22 @@ export default function Tasks() {
     };
 
     const handleView = (task: any) => {
-        if (isStandard || activeTab !== "reportes") {
+        const openAssignedView =
+            (isStandard && !leaderWorkspace) ||
+            (leaderWorkspace && activeTab === "asignadas") ||
+            activeTab === "gestion";
+
+        if (openAssignedView) {
             setViewTaskId(task.id);
         } else {
+            setReviewMode(false);
             setReviewReportId(task.id);
         }
+    };
+
+    const handleReview = (reportId: number) => {
+        setReviewMode(true);
+        setReviewReportId(reportId);
     };
 
     const handleSubmitReportFromList = (task: any) => {
@@ -92,24 +133,83 @@ export default function Tasks() {
         ? "Modulo de Tareas Administrador"
         : isCommunications
           ? "Modulo de Tareas — Comunicaciones"
-          : "Mis Tareas Asignadas";
+          : leaderWorkspace
+            ? "Modulo tareas Lider de Grupo"
+            : "Mis Tareas Asignadas";
 
-    const tableView = isStandard ? "assigned" : activeTab;
+    const tableView =
+        leaderWorkspace && activeTab === "asignadas"
+            ? "assigned"
+            : isStandard && !leaderWorkspace
+              ? "assigned"
+              : activeTab === "asignadas"
+                ? "assigned"
+                : activeTab;
+
+    const filteredTasks = useMemo(() => {
+        if (!showAssignedSearch || !searchQuery.trim()) return taskList;
+
+        const q = searchQuery.trim().toLowerCase();
+        const statusText = (task: any) => {
+            if (!task.my_report_id && !task.my_review_status) return "sin enviar";
+            if (task.my_review_status === "pending") return "pendiente revisión";
+            if (task.my_review_status === "approved") return "aprobado";
+            if (task.my_review_status === "rejected") return "rechazado";
+            return "";
+        };
+
+        return taskList.filter((task) => {
+            const text = [
+                task.title,
+                task.userName,
+                task.groupName,
+                statusText(task),
+                task.created_at ? new Date(task.created_at).toLocaleDateString() : "",
+            ]
+                .filter(Boolean)
+                .join(" ")
+                .toLowerCase();
+            return text.includes(q);
+        });
+    }, [showAssignedSearch, searchQuery, taskList]);
+
+    const tableEmptyMessage =
+        showAssignedSearch && searchQuery.trim() && taskList.length > 0
+            ? "No hay tareas que coincidan con tu búsqueda."
+            : undefined;
 
     return (
         <div className="col-span-12 p-4">
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
                 <div>
                     <h1 className="text-2xl font-bold dark:text-white">{pageTitle}</h1>
-                    {isStandard && (
+                    {isStandard && !leaderWorkspace && (
                         <p className="text-sm text-gray-500 mt-1">
                             Revisa la tarea asignada y envía tu informe para aprobación.
+                        </p>
+                    )}
+                    {leaderWorkspace && (
+                        <p className="text-sm text-gray-500 mt-1">
+                            Gestiona las tareas de tu grupo y revisa los informes de tus miembros.
                         </p>
                     )}
                 </div>
 
                 {showWorkspaceTabs && (
-                    <div className="flex bg-gray-100 dark:bg-gray-700 p-1 rounded-xl">
+                    <div className="flex flex-wrap bg-gray-100 dark:bg-gray-700 p-1 rounded-xl gap-1">
+                        {leaderWorkspace && (
+                            <button
+                                type="button"
+                                onClick={() => setActiveTab("asignadas")}
+                                className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                                    activeTab === "asignadas"
+                                        ? "bg-white dark:bg-gray-600 shadow-sm text-blue-600"
+                                        : "text-gray-500"
+                                }`}
+                            >
+                                Mis Tareas
+                            </button>
+                        )}
                         <button
                             type="button"
                             onClick={() => setActiveTab("reportes")}
@@ -139,7 +239,25 @@ export default function Tasks() {
             <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-2">
                 {showFilters && (
                     <div className="mb-6 px-4 pt-4">
-                        <TaskFilters onFilterChange={setFilters} />
+                        <TaskFilters
+                            onFilterChange={setFilters}
+                            isLeaderMode={leaderWorkspace}
+                        />
+                    </div>
+                )}
+
+                {showAssignedSearch && (
+                    <div className="mb-4 px-4 pt-4">
+                        <label className="block text-xs font-bold text-gray-500 uppercase ml-1 mb-1">
+                            Buscar tarea
+                        </label>
+                        <input
+                            type="text"
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
+                            placeholder="Buscar por título, asignado por, estado o fecha..."
+                            className="w-full md:max-w-md bg-white dark:bg-gray-800 border-none rounded-xl shadow-sm focus:ring-2 focus:ring-blue-500 h-11 px-4"
+                        />
                     </div>
                 )}
 
@@ -167,18 +285,22 @@ export default function Tasks() {
                         <TaskTable
                             key={refreshKey}
                             view={tableView}
-                            tasks={taskList}
+                            tasks={filteredTasks}
                             loading={loading}
                             userType={user?.type_user}
+                            emptyMessage={tableEmptyMessage}
                             onEdit={handleEdit}
                             onView={handleView}
-                            onSubmitReport={isStandard ? handleSubmitReportFromList : undefined}
+                            onSubmitReport={
+                                showAssignedSearch ? handleSubmitReportFromList : undefined
+                            }
                             onReview={
-                                (isAdmin || isCommunications) && activeTab === "reportes"
-                                    ? setReviewReportId
+                                (isAdmin || isCommunications || leaderWorkspace) &&
+                                activeTab === "reportes"
+                                    ? handleReview
                                     : undefined
                             }
-                            readOnly={isStandard}
+                            readOnly={isStandard && activeTab !== "gestion"}
                         />
                     )}
                 </div>
@@ -189,6 +311,7 @@ export default function Tasks() {
                 onClose={() => setIsModalOpen(false)}
                 onSuccess={handleRefresh}
                 initialData={selectedTask}
+                isLeaderMode={leaderWorkspace}
             />
 
             <TaskViewModal
@@ -208,7 +331,11 @@ export default function Tasks() {
             <TaskReviewModal
                 isOpen={!!reviewReportId}
                 reportId={reviewReportId}
-                onClose={() => setReviewReportId(null)}
+                reviewMode={reviewMode}
+                onClose={() => {
+                    setReviewReportId(null);
+                    setReviewMode(false);
+                }}
                 onSuccess={handleRefresh}
             />
         </div>

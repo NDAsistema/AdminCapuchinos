@@ -23,6 +23,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
           setUser({
             ...parsed,
             type_user: Number(parsed.type_user),
+            is_group_leader: Boolean(parsed.is_group_leader),
           });
         }
       } catch (e) {
@@ -38,6 +39,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     const normalized = {
       ...userData,
       type_user: Number(userData.type_user),
+      is_group_leader: Boolean(userData.is_group_leader),
     };
     localStorage.setItem("token", token);
     localStorage.setItem("user", JSON.stringify(normalized));

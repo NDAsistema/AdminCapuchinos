@@ -106,6 +106,20 @@ export class GroupController {
         }
     }
 
+    static async findForGroupLeader(req: AuthRequest, res: Response) {
+        try {
+            const brotherId = req.user?.id_brother;
+            if (!brotherId) {
+                return res.json({ success: true, data: [], count: 0 });
+            }
+            const groups = await GroupModel.findByGroupLeader(Number(brotherId));
+            res.json({ success: true, data: groups, count: (groups as any[]).length });
+        } catch (error) {
+            console.error('Error getting groups for group leader:', error);
+            res.status(500).json({ success: false, message: 'Error interno del servidor' });
+        }
+    }
+
     static async getAll(req: Request, res: Response) {
         try {
             const groups = await GroupModel.findAll();

@@ -23,6 +23,7 @@ export interface Task {
 export interface TaskFilters {
     groupId?: string;
     userId?: string;
+    brotherId?: string;
 }
 
 const TASK_DETAIL_SELECT = `
@@ -89,16 +90,42 @@ export class TaskModel {
     private static buildFilterClauses(filters: TaskFilters, params: any[]) {
         let sql = '';
         if (filters.groupId) {
-            sql += ` AND EXISTS (
-                SELECT 1 FROM task_assignments ta
-                WHERE ta.task_id = COALESCE(t.parent_task_id, t.id)
-                  AND ta.assigned_type = 2 AND ta.assigned_id = ?
+            const groupId = Number(filters.groupId);
+            sql += ` AND (
+                EXISTS (
+                    SELECT 1 FROM task_assignments ta
+                    WHERE ta.task_id = COALESCE(t.parent_task_id, t.id)
+                      AND ta.status = 1
+                      AND (
+                        (ta.assigned_type = 2 AND ta.assigned_id = ?)
+                        OR (
+                            ta.assigned_type = 1 AND EXISTS (
+                                SELECT 1 FROM releations_groups_brotthers rgb
+                                WHERE rgb.id_brotther = ta.assigned_id
+                                  AND rgb.id_group = ? AND rgb.status = 1
+                            )
+                        )
+                      )
+                )
+                OR EXISTS (
+                    SELECT 1 FROM users ru
+                    INNER JOIN releations_groups_brotthers rgb
+                        ON rgb.id_brotther = ru.id_brother AND rgb.status = 1
+                    WHERE ru.id = t.created_by AND rgb.id_group = ?
+                )
             )`;
-            params.push(Number(filters.groupId));
+            params.push(groupId, groupId, groupId);
         }
         if (filters.userId) {
             sql += ` AND t.created_by = ?`;
             params.push(Number(filters.userId));
+        }
+        if (filters.brotherId) {
+            sql += ` AND EXISTS (
+                SELECT 1 FROM users filter_u
+                WHERE filter_u.id = t.created_by AND filter_u.id_brother = ?
+            )`;
+            params.push(Number(filters.brotherId));
         }
         return sql;
     }
@@ -304,20 +331,8 @@ export class TaskModel {
         const parentId = report.parent_task_id;
 
         if (typeUser === 3 && brotherId) {
-            const [rows]: any = await pool.execute(
-                `SELECT 1 FROM tasks pt
-                 INNER JOIN task_assignments ta ON ta.task_id = pt.id
-                 LEFT JOIN releations_home_groups rhg ON ta.assigned_type = 2 AND rhg.id_group = ta.assigned_id
-                 LEFT JOIN homes h ON h.id = rhg.id_home AND h.communication_user = ? AND h.status = 1
-                 LEFT JOIN releations_groups_brotthers rgb ON ta.assigned_type = 2 AND rgb.id_group = ta.assigned_id AND rgb.status = 1
-                 LEFT JOIN releations_home_groups rhg2 ON rhg2.id_group = rgb.id_group
-                 LEFT JOIN homes h2 ON h2.id = rhg2.id_home AND h2.communication_user = ? AND h2.status = 1
-                 WHERE pt.id = ?
-                 AND (h.id IS NOT NULL OR h2.id IS NOT NULL)
-                 LIMIT 1`,
-                [brotherId, brotherId, parentId]
-            );
-            if (rows.length > 0) return true;
+            const inScope = await this.isParentTaskInCommsScope(parentId, brotherId);
+            if (inScope) return true;
         }
 
         if (brotherId) {
@@ -331,6 +346,155 @@ export class TaskModel {
             if (rows.length > 0) return true;
         }
 
+        if (typeUser === 2 && brotherId) {
+            const [memberRows]: any = await pool.execute(
+                `SELECT 1 FROM users ru
+                 INNER JOIN releations_groups_brotthers rgb
+                    ON rgb.id_brotther = ru.id_brother AND rgb.status = 1
+                 INNER JOIN releations_groups_brotthers leader_rgb
+                    ON leader_rgb.id_group = rgb.id_group
+                    AND leader_rgb.leader = 1 AND leader_rgb.status = 1
+                 WHERE ru.id = ? AND leader_rgb.id_brotther = ?
+                 LIMIT 1`,
+                [report.created_by, brotherId]
+            );
+            if (memberRows.length > 0) return true;
+
+            const [parentRows]: any = await pool.execute(
+                `SELECT 1 FROM tasks pt
+                 INNER JOIN users leader_u ON leader_u.id_brother = ?
+                 WHERE pt.id = ? AND pt.created_by = leader_u.id
+                 LIMIT 1`,
+                [brotherId, parentId]
+            );
+            if (parentRows.length > 0) return true;
+        }
+
         return false;
+    }
+
+    /** Tarea padre dentro del alcance de fraternidades del usuario de comunicaciones */
+    static async isParentTaskInCommsScope(
+        parentTaskId: number,
+        communicationBrotherId: number
+    ): Promise<boolean> {
+        const [rows]: any = await pool.execute(
+            `SELECT 1 FROM tasks pt
+             INNER JOIN task_assignments ta ON ta.task_id = pt.id AND ta.status = 1
+             WHERE pt.id = ?
+             AND (
+                (ta.assigned_type = 2 AND EXISTS (
+                    SELECT 1 FROM releations_home_groups rhg
+                    INNER JOIN homes h ON h.id = rhg.id_home AND h.communication_user = ? AND h.status = 1
+                    WHERE rhg.id_group = ta.assigned_id
+                ))
+                OR (ta.assigned_type = 1 AND EXISTS (
+                    SELECT 1 FROM releations_groups_brotthers rgb
+                    INNER JOIN releations_home_groups rhg ON rhg.id_group = rgb.id_group
+                    INNER JOIN homes h ON h.id = rhg.id_home AND h.communication_user = ? AND h.status = 1
+                    WHERE rgb.id_brotther = ta.assigned_id AND rgb.status = 1
+                ))
+                OR (ta.assigned_type = 0 AND EXISTS (
+                    SELECT 1 FROM homes h WHERE h.communication_user = ? AND h.status = 1
+                ))
+             )
+             LIMIT 1`,
+            [parentTaskId, communicationBrotherId, communicationBrotherId, communicationBrotherId]
+        );
+        return rows.length > 0;
+    }
+
+    static async isGroupLeader(brotherId: number | null): Promise<boolean> {
+        if (!brotherId) return false;
+        const [rows]: any = await pool.execute(
+            `SELECT 1 FROM releations_groups_brotthers
+             WHERE id_brotther = ? AND leader = 1 AND status = 1 LIMIT 1`,
+            [brotherId]
+        );
+        return rows.length > 0;
+    }
+
+    static async getLeaderUserReports(
+        leaderBrotherId: number,
+        filters: TaskFilters = {}
+    ): Promise<any[]> {
+        const params: any[] = [leaderBrotherId, leaderBrotherId];
+        let extra = `
+            AND t.task_origin = 2
+            AND t.parent_task_id IS NOT NULL
+            AND (
+                EXISTS (
+                    SELECT 1 FROM users ru
+                    INNER JOIN releations_groups_brotthers rgb
+                        ON rgb.id_brotther = ru.id_brother AND rgb.status = 1
+                    INNER JOIN releations_groups_brotthers leader_rgb
+                        ON leader_rgb.id_group = rgb.id_group
+                        AND leader_rgb.leader = 1 AND leader_rgb.status = 1
+                    WHERE ru.id = t.created_by AND leader_rgb.id_brotther = ?
+                )
+                OR EXISTS (
+                    SELECT 1 FROM tasks pt
+                    INNER JOIN users leader_u ON leader_u.id_brother = ?
+                    WHERE pt.id = t.parent_task_id AND pt.created_by = leader_u.id
+                )
+            )
+        `;
+        extra += this.buildFilterClauses(filters, params);
+        return this.queryDetailed(extra, params);
+    }
+
+    static async getLeaderManagementTasks(
+        userId: number,
+        filters: TaskFilters = {}
+    ): Promise<any[]> {
+        const params: any[] = [userId];
+        let extra = `
+            AND t.created_by = ?
+            AND t.parent_task_id IS NULL
+            AND t.task_origin = 2
+        `;
+        extra += this.buildFilterClauses(filters, params);
+        return this.queryDetailed(extra, params);
+    }
+
+    static async validateLeaderAssignments(
+        leaderBrotherId: number,
+        assignedType: number,
+        assignedIds: number[]
+    ): Promise<void> {
+        if (assignedType === 0) {
+            throw new Error('Como líder solo puedes asignar a personas o grupos de tu cargo');
+        }
+
+        if (assignedType === 2) {
+            for (const groupId of assignedIds) {
+                const [rows]: any = await pool.execute(
+                    `SELECT 1 FROM releations_groups_brotthers
+                     WHERE id_group = ? AND id_brotther = ? AND leader = 1 AND status = 1 LIMIT 1`,
+                    [groupId, leaderBrotherId]
+                );
+                if (!rows.length) {
+                    throw new Error('Solo puedes asignar a grupos que lideras');
+                }
+            }
+            return;
+        }
+
+        if (assignedType === 1) {
+            for (const brotherId of assignedIds) {
+                const [rows]: any = await pool.execute(
+                    `SELECT 1 FROM releations_groups_brotthers rgb
+                     INNER JOIN releations_groups_brotthers leader_rgb
+                        ON leader_rgb.id_group = rgb.id_group
+                        AND leader_rgb.leader = 1 AND leader_rgb.status = 1
+                     WHERE rgb.id_brotther = ? AND rgb.status = 1
+                       AND leader_rgb.id_brotther = ? LIMIT 1`,
+                    [brotherId, leaderBrotherId]
+                );
+                if (!rows.length) {
+                    throw new Error('Solo puedes asignar a miembros de tus grupos');
+                }
+            }
+        }
     }
 }

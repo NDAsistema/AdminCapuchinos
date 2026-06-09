@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import { UserModel } from '../models/UserModel';
+import { TaskModel } from '../models/TaskModel';
 import jwt from 'jsonwebtoken';
 import bcrypt from 'bcrypt';
 
@@ -49,6 +50,11 @@ export class AuthController {
         });
       }
 
+      const isGroupLeader =
+        Number(user.type_user) === 2 && user.id_brother
+          ? await TaskModel.isGroupLeader(Number(user.id_brother))
+          : false;
+
       // Generar Token JWT
       const token = jwt.sign(
         { 
@@ -57,7 +63,8 @@ export class AuthController {
           email: user.email, 
           name_brother: user.name_brother,
           img_brother: user.img_brother,
-          type_user: user.type_user 
+          type_user: user.type_user,
+          is_group_leader: isGroupLeader,
         },
         process.env.JWT_SECRET || 'secret_key',
         { expiresIn: '24h' }
@@ -72,7 +79,8 @@ export class AuthController {
           type_user: user.type_user,
           name_brother: user.name_brother,
           img_brother: user.img_brother,
-          status: user.status
+          status: user.status,
+          is_group_leader: isGroupLeader,
         },
         token,
         message: 'Login exitoso'
@@ -100,16 +108,22 @@ export class AuthController {
         });
       }
       
+      const isGroupLeader =
+        Number(user.type_user) === 2 && user.id_brother
+          ? await TaskModel.isGroupLeader(Number(user.id_brother))
+          : false;
+
       return res.json({
         success: true,
         user: {
           id: user.id,
-          id_brother: user.id_brother, // Validar que el middleware use este nombre
+          id_brother: user.id_brother,
           email: user.email,
           name_brother: user.name_brother,
           img_brother: user.img_brother,
           type_user: user.type_user,
-          status: user.status
+          status: user.status,
+          is_group_leader: isGroupLeader,
         }
       });
     } catch (error) {

@@ -10,6 +10,8 @@ router.get('/findBrothersForGuardian', BrotherController.findBrothersForGuardian
 router.get('/findBrothersForParishPriest', BrotherController.findBrothersForParishPriest);
 router.get('/findBrothersForCommunicationUser', BrotherController.findBrothersForCommunicationUser);
 router.get('/usersInCommsScope', BrotherController.findUsersInCommsScope);
+router.get('/standardUsersInGroup', BrotherController.findStandardUsersInGroup);
+router.get('/membersInLedGroups', BrotherController.findMembersInLedGroups);
 router.get('/getListTypeUserServices', BrotherController.getListTypeUserServices);
 router.get('/', BrotherController.getAll);                     // Obtener todos los hermanos
 router.post('/', BrotherController.create);                    // Crear hermano

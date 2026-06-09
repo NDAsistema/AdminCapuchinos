@@ -9,6 +9,7 @@ router.put('/:id', GroupController.update);
 router.delete('/:id', GroupController.delete);
 router.get('/', GroupController.getAll);
 router.get('/forCommunicationUser', GroupController.findForCommunicationUser);
+router.get('/forGroupLeader', GroupController.findForGroupLeader);
 router.get('/:id', GroupController.getById);
 router.get('/:id/getListBrotherAssing', GroupController.getListBrotherAssing);
 

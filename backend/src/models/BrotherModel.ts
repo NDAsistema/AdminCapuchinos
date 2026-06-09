@@ -151,18 +151,104 @@ export class BrotherModel {
     return rows;
   }
 
-  /** Usuarios estándar en grupos de fraternidades del responsable de comunicaciones */
-  static async findUsersInCommsScope(communicationBrotherId: number): Promise<any[]> {
+  /** Hermanos en grupos de fraternidades del responsable de comunicaciones */
+  static async findUsersInCommsScope(
+    communicationBrotherId: number,
+    groupId?: number
+  ): Promise<any[]> {
+    const groupClause = groupId ? ' AND rgb.id_group = ?' : '';
     const [rows] = await pool.execute(
-      `SELECT DISTINCT u.id, b.name AS name
-       FROM users u
-       INNER JOIN brothers b ON b.id = u.id_brother AND b.status = 1
+      `SELECT DISTINCT
+          b.id AS brotherId,
+          b.name AS name,
+          u.id AS userId
+       FROM brothers b
        INNER JOIN releations_groups_brotthers rgb ON rgb.id_brotther = b.id AND rgb.status = 1
        INNER JOIN releations_home_groups rhg ON rhg.id_group = rgb.id_group
        INNER JOIN homes h ON h.id = rhg.id_home AND h.status = 1 AND h.communication_user = ?
-       WHERE u.type_user = 2 AND u.status = 1
+       INNER JOIN \`groups\` g ON g.id = rgb.id_group AND g.status = 1
+       LEFT JOIN users u ON u.id_brother = b.id AND u.status = 1 AND u.type_user = 2
+       WHERE b.status = 1
+         AND b.id <> ?
+         AND NOT EXISTS (
+           SELECT 1 FROM users ux
+           WHERE ux.id_brother = b.id AND ux.status = 1 AND ux.type_user IN (1, 3)
+         )${groupClause}
        ORDER BY b.name ASC`,
-      [communicationBrotherId]
+      groupId
+        ? [communicationBrotherId, communicationBrotherId, groupId]
+        : [communicationBrotherId, communicationBrotherId]
+    );
+    return rows as any[];
+  }
+
+  /** Hermanos en grupos donde el usuario es líder */
+  static async findMembersInLedGroups(
+    leaderBrotherId: number,
+    groupId?: number
+  ): Promise<any[]> {
+    const groupClause = groupId ? ' AND rgb.id_group = ?' : '';
+    const params = groupId
+      ? [leaderBrotherId, leaderBrotherId, groupId]
+      : [leaderBrotherId, leaderBrotherId];
+
+    const [rows] = await pool.execute(
+      `SELECT DISTINCT
+          b.id AS brotherId,
+          b.name AS name,
+          u.id AS userId
+       FROM brothers b
+       INNER JOIN releations_groups_brotthers rgb ON rgb.id_brotther = b.id AND rgb.status = 1
+       INNER JOIN releations_groups_brotthers leader_rgb
+          ON leader_rgb.id_group = rgb.id_group
+          AND leader_rgb.leader = 1 AND leader_rgb.status = 1
+       INNER JOIN \`groups\` g ON g.id = rgb.id_group AND g.status = 1
+       LEFT JOIN users u ON u.id_brother = b.id AND u.status = 1 AND u.type_user = 2
+       WHERE b.status = 1
+         AND leader_rgb.id_brotther = ?
+         AND b.id <> ?
+         AND NOT EXISTS (
+           SELECT 1 FROM users ux
+           WHERE ux.id_brother = b.id AND ux.status = 1 AND ux.type_user IN (1, 3)
+         )${groupClause}
+       ORDER BY b.name ASC`,
+      params
+    );
+    return rows as any[];
+  }
+
+  /** Hermanos activos de uno o más grupos */
+  static async getBrotherIdsByGroupIds(
+    groupIds: number[],
+    excludeBrotherId?: number
+  ): Promise<number[]> {
+    if (!groupIds.length) return [];
+    const placeholders = groupIds.map(() => '?').join(', ');
+    const params: any[] = [...groupIds];
+    let excludeClause = '';
+    if (excludeBrotherId) {
+      excludeClause = ' AND rgb.id_brotther <> ?';
+      params.push(excludeBrotherId);
+    }
+    const [rows] = await pool.execute(
+      `SELECT DISTINCT rgb.id_brotther AS brotherId
+       FROM releations_groups_brotthers rgb
+       WHERE rgb.id_group IN (${placeholders}) AND rgb.status = 1${excludeClause}`,
+      params
+    );
+    return (rows as any[]).map((r) => Number(r.brotherId));
+  }
+
+  /** Usuarios estándar que pertenecen a un grupo (filtros admin) */
+  static async findStandardUsersInGroup(groupId: number): Promise<any[]> {
+    const [rows] = await pool.execute(
+      `SELECT DISTINCT u.id AS userId, b.id AS brotherId, b.name AS name
+       FROM releations_groups_brotthers rgb
+       INNER JOIN brothers b ON b.id = rgb.id_brotther AND b.status = 1
+       INNER JOIN users u ON u.id_brother = b.id AND u.type_user = 2 AND u.status = 1
+       WHERE rgb.id_group = ? AND rgb.status = 1
+       ORDER BY b.name ASC`,
+      [groupId]
     );
     return rows as any[];
   }
