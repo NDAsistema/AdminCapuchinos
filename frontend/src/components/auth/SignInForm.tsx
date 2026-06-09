@@ -16,7 +16,10 @@ export default function SignInForm() {
     e.preventDefault();
     setLoading(true);
     try {
-      const response = await authService.login(formData);
+      const response = await authService.login({
+        email: formData.email.trim().toLowerCase(),
+        password: formData.password,
+      });
       if (response.success) {
         login(response.user, response.token);
         navigate("/", { replace: true });

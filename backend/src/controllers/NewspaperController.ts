@@ -1,7 +1,7 @@
 import { Response } from 'express';
 import { AuthRequest } from '../middleware/authMiddleware'; 
 import { NewspaperModel } from '../models/NewspaperModel';
-import { AttachmentController } from './attachmentController'; 
+import { AttachmentController } from './AttachmentController'; 
 import AWSS3Service from '../services/awsS3Service';
 import { AuthController } from './authController';
 

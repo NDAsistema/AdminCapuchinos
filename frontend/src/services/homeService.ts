@@ -27,7 +27,7 @@ api.interceptors.response.use(
       localStorage.removeItem('token');
       localStorage.removeItem('user');
       // Opcional: Redirigir al login
-      // window.location.href = '/signin';
+      window.location.href = '/signin';
     }
     return Promise.reject(error);
   }

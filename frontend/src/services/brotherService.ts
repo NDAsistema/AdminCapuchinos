@@ -100,6 +100,27 @@ class BrotherService {
         return response.data.data;
     }
 
+    async findUsersInCommsScope(groupId?: string): Promise<any[]> {
+        const response = await api.get('/brother/usersInCommsScope', {
+            params: groupId ? { groupId } : undefined,
+        });
+        return response.data.data || [];
+    }
+
+    async findStandardUsersInGroup(groupId: string): Promise<any[]> {
+        const response = await api.get('/brother/standardUsersInGroup', {
+            params: { groupId },
+        });
+        return response.data.data || [];
+    }
+
+    async findMembersInLedGroups(groupId?: string): Promise<any[]> {
+        const response = await api.get('/brother/membersInLedGroups', {
+            params: groupId ? { groupId } : undefined,
+        });
+        return response.data.data || [];
+    }
+
     async findBrothersForCommunicationUser(): Promise<any[]> {
         const response = await api.get('/brother/findBrothersForCommunicationUser');
         return response.data.data;

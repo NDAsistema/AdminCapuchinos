@@ -154,7 +154,7 @@ export class HomeController {
 
                 const { home_id, orderimg } = req.body;
                 // Aquí ya no dará error porque req es AuthRequest
-                const id_brotther = req.user?.id_brotther || 0;
+                const id_brotther = req.user?.id_brother || 0;
 
                 const imageUrl = await AWSS3Service.uploadHomeImage(req.file);
                 

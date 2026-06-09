@@ -160,6 +160,38 @@ class GroupService {
       return false;
     }
   }
+
+  static async getAllGroups() {
+    try {
+      const response = await api.get('/group');
+      console.log(response.data.data);
+      return response.data.data || response.data;
+    } catch (error) {
+      console.error('Error al obtener grupos:', error);
+      throw error;
+    }
+  }
+
+  static async findGroupsForCommunicationUser() {
+    try {
+      const response = await api.get('/group/forCommunicationUser');
+      return response.data.data || [];
+    } catch (error) {
+      console.error('Error al obtener grupos de comunicaciones:', error);
+      return [];
+    }
+  }
+
+  static async findGroupsForGroupLeader() {
+    try {
+      const response = await api.get('/group/forGroupLeader');
+      return response.data.data || [];
+    } catch (error) {
+      console.error('Error al obtener grupos del líder:', error);
+      return [];
+    }
+  }
+
 }
 
 export default GroupService;

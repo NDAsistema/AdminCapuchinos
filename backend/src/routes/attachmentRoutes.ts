@@ -1,7 +1,7 @@
 
 import { Router } from 'express';
 import multer from 'multer';
-import { AttachmentController } from '../controllers/attachmentController';
+import { AttachmentController } from '../controllers/AttachmentController';
 
 const router = Router();
 
@@ -11,5 +11,6 @@ const upload = multer({
 });
 
 router.post('/upload-newspaper-image', upload.single('file'), AttachmentController.uploadFromEditor);
+router.post('/upload-task-image', upload.single('file'), AttachmentController.uploadFromEditorTask);
 
 export default router;

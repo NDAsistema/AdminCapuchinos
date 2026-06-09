@@ -1,4 +1,5 @@
 import { Request, Response } from 'express';
+import { AuthRequest } from '../middleware/authMiddleware';
 import { GroupModel } from '../models/GroupModel';
 import { ReleationHomeGroupModel } from '../models/ReleationsHomeGroup';
 import { ReleationsGroupsBrottherModel } from '../models/ReleationsGroupsBrottherModel';
@@ -88,6 +89,34 @@ export class GroupController {
                 success: false, 
                 message: 'Error interno del servidor al eliminar el grupo' 
             });
+        }
+    }
+
+    static async findForCommunicationUser(req: AuthRequest, res: Response) {
+        try {
+            const brotherId = req.user?.id_brother;
+            if (!brotherId) {
+                return res.json({ success: true, data: [], count: 0 });
+            }
+            const groups = await GroupModel.findByCommunicationBrother(Number(brotherId));
+            res.json({ success: true, data: groups, count: (groups as any[]).length });
+        } catch (error) {
+            console.error('Error getting groups for communication user:', error);
+            res.status(500).json({ success: false, message: 'Error interno del servidor' });
+        }
+    }
+
+    static async findForGroupLeader(req: AuthRequest, res: Response) {
+        try {
+            const brotherId = req.user?.id_brother;
+            if (!brotherId) {
+                return res.json({ success: true, data: [], count: 0 });
+            }
+            const groups = await GroupModel.findByGroupLeader(Number(brotherId));
+            res.json({ success: true, data: groups, count: (groups as any[]).length });
+        } catch (error) {
+            console.error('Error getting groups for group leader:', error);
+            res.status(500).json({ success: false, message: 'Error interno del servidor' });
         }
     }
 
