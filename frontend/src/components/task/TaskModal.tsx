@@ -41,7 +41,8 @@ export const TaskModal: React.FC<Props> = ({ isOpen, onClose, onSuccess, initial
     const [recurrenceRule, setRecurrenceRule] = useState('weekly');
 
     const [touched, setTouched] = useState(false);
-    const isEdit = !!initialData;
+    const [loadingDetail, setLoadingDetail] = useState(false);
+    const isEdit = !!initialData?.id;
 
     const customSelectStyles = {
         control: (base: any) => ({
@@ -66,19 +67,63 @@ export const TaskModal: React.FC<Props> = ({ isOpen, onClose, onSuccess, initial
     };
 
     useEffect(() => {
-        if (isOpen && initialData) {
-            setTitle(initialData.title || '');
-            setContent(initialData.content || '');
-            setPriority(initialData.priority || 'medium');
-            setTypeAssing(String(initialData.assigned_type || '1'));
-            setDueDate(initialData.due_date ? initialData.due_date.split('T')[0] : '');
-            setIsRecurring(!!initialData.is_recurring);
-            setRecurrenceRule(initialData.recurrence_rule || 'weekly');
-        } else if (!isOpen) {
-            setTitle(''); setContent(''); setSelectedOptions([]); setTouched(false);
-            setPriority('medium'); setTypeAssing('1'); setDueDate(''); setIsRecurring(false);
+        if (!isOpen) {
+            setTitle('');
+            setContent('');
+            setSelectedOptions([]);
+            setTouched(false);
+            setPriority('medium');
+            setTypeAssing('1');
+            setDueDate('');
+            setIsRecurring(false);
+            return;
         }
-    }, [isOpen, initialData]);
+
+        if (!initialData?.id) return;
+
+        setLoadingDetail(true);
+        TaskService.getTaskDetail(initialData.id)
+            .then((detail) => {
+                setTitle(detail.title || '');
+                setContent(detail.content || '');
+                setPriority((detail.priority as any) || 'medium');
+                const assignType =
+                    detail.assigned_type != null ? String(detail.assigned_type) : '1';
+                setTypeAssing(assignType);
+                setDueDate(detail.due_date ? String(detail.due_date).split('T')[0] : '');
+                setIsRecurring(!!detail.is_recurring);
+                setRecurrenceRule(detail.recurrence_rule || 'weekly');
+
+                const assignments = (detail as any).assignments || [];
+                if (Number(detail.assigned_type) === 0) {
+                    setSelectedOptions([]);
+                } else if (assignments.length > 0) {
+                    const typeNum = Number(detail.assigned_type);
+                    setSelectedOptions(
+                        assignments
+                            .filter((a: any) => a.assigned_type === typeNum)
+                            .map((a: any) => ({
+                                value: String(a.assigned_id),
+                                label: a.assigned_name || `ID ${a.assigned_id}`,
+                            }))
+                    );
+                } else if (detail.assigned_ids?.length) {
+                    setSelectedOptions(
+                        detail.assigned_ids.map((id: number) => ({
+                            value: String(id),
+                            label: `ID ${id}`,
+                        }))
+                    );
+                } else {
+                    setSelectedOptions([]);
+                }
+            })
+            .catch((err) => {
+                console.error('Error cargando tarea:', err);
+                Swal.fire('Error', 'No se pudo cargar la tarea para editar', 'error');
+            })
+            .finally(() => setLoadingDetail(false));
+    }, [isOpen, initialData?.id]);
 
     useEffect(() => {
         if (!isOpen || !user || typeAssing === '0') return;
@@ -87,7 +132,13 @@ export const TaskModal: React.FC<Props> = ({ isOpen, onClose, onSuccess, initial
             try {
                 let data: any[] = [];
                 if (user.type_user === 1) { 
-                    data = typeAssing === '1' ? await brotherService.getAllBrothers() : (await GroupService.getAllGroups())[0] || [];
+                    const groupsRes = await GroupService.getAll();
+                    const groupsList = Array.isArray(groupsRes)
+                        ? groupsRes
+                        : groupsRes?.[0] || [];
+                    data = typeAssing === '1'
+                        ? await brotherService.getAllBrothers()
+                        : groupsList;
                 } else if (user.type_user === 3) {
                     data = typeAssing === '1'
                         ? await brotherService.findUsersInCommsScope()
@@ -105,12 +156,31 @@ export const TaskModal: React.FC<Props> = ({ isOpen, onClose, onSuccess, initial
                     value: String(item.brotherId ?? item.id), 
                     label: item.name_group || item.name_brother || item.name || 'Sin nombre'
                 })));
+
+                if (isEdit && selectedOptions.length > 0) {
+                    setSelectedOptions((prev) =>
+                        prev.map((sel) => {
+                            const match = data.find(
+                                (item) => String(item.brotherId ?? item.id) === sel.value
+                            );
+                            if (!match) return sel;
+                            return {
+                                value: sel.value,
+                                label:
+                                    match.name_group ||
+                                    match.name_brother ||
+                                    match.name ||
+                                    sel.label,
+                            };
+                        })
+                    );
+                }
             } catch (error) {
                 console.error("Error cargando opciones", error);
             }
         };
         loadOptions();
-    }, [typeAssing, user, isOpen, leaderMode]);
+    }, [typeAssing, user, isOpen, leaderMode, isEdit]);
 
     const handleSave = async () => {
         setTouched(true);
@@ -150,6 +220,16 @@ export const TaskModal: React.FC<Props> = ({ isOpen, onClose, onSuccess, initial
     };
 
     if (!isOpen) return null;
+
+    if (loadingDetail && isEdit) {
+        return (
+            <div className="fixed modal-capuchinos inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+                <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-10">
+                    <p className="text-gray-500">Cargando tarea...</p>
+                </div>
+            </div>
+        );
+    }
 
     const canChooseAssignType =
         user?.type_user === 1 || user?.type_user === 3 || leaderMode;

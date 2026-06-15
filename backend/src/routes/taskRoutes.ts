@@ -9,8 +9,7 @@ router.post('/:id/submit-report', TaskController.submitReport);
 router.patch('/reports/:id/review', TaskController.reviewReport);
 
 router.post('/', TaskController.createTask);
-
-// router.put('/:id', TaskController.updateTask);
+router.put('/:id', TaskController.updateTask);
 
 // router.delete('/:id', TaskController.deleteTask);
 

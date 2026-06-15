@@ -95,13 +95,26 @@ export class TaskService {
         }
 
         const canAccess =
-            user.type_user === 1 ||
+            Number(user.type_user) === 1 ||
+            Number(user.type_user) === 3 ||
+            task.created_by === user.id ||
             (await TaskModel.userCanAccessMasterTask(taskId, user.id, user.id_brother));
 
         if (!canAccess) throw new Error('No autorizado');
 
+        const assignments = await TaskAssignmentModel.findEnrichedByTaskId(taskId);
+        const { assigned_type, assigned_ids } =
+            TaskAssignmentModel.deriveSummary(assignments);
+
         const myReport = await TaskModel.findUserReportForParent(taskId, user.id);
-        return { ...task, myReport, canSubmit: !myReport && user.type_user === 2 };
+        return {
+            ...task,
+            assignments,
+            assigned_type,
+            assigned_ids,
+            myReport,
+            canSubmit: !myReport && user.type_user === 2,
+        };
     }
 
     static async submitReport(
@@ -221,6 +234,116 @@ export class TaskService {
         return { reviewStatus };
     }
 
+    private static async buildAssignmentRows(
+        taskId: number,
+        assignedType: number,
+        assignedIds: number[],
+        excludeBrotherId?: number | null
+    ): Promise<{ rows: any[][]; notifyType: number; notifyIds: number[] }> {
+        let assignmentsData: any[][] = [];
+        let notifyType = assignedType;
+        let notifyIds = assignedIds;
+
+        if (assignedType === 0) {
+            assignmentsData.push([taskId, 0, null]);
+        } else if (assignedType === 2 && assignedIds.length > 0) {
+            const brotherIds = await BrotherModel.getBrotherIdsByGroupIds(
+                assignedIds,
+                excludeBrotherId ?? undefined
+            );
+            if (brotherIds.length === 0) {
+                throw new Error('El grupo seleccionado no tiene miembros asignables');
+            }
+            assignmentsData = brotherIds.map((brotherId) => [taskId, 1, brotherId]);
+            notifyType = 1;
+            notifyIds = brotherIds;
+        } else if (assignedIds.length > 0) {
+            assignmentsData = assignedIds.map((id) => [taskId, assignedType, id]);
+        }
+
+        return { rows: assignmentsData, notifyType, notifyIds };
+    }
+
+    private static async userCanEditMasterTask(task: any, user: AuthUser): Promise<boolean> {
+        if (Number(user.type_user) === 1) return true;
+        if (Number(user.type_user) === 3 && task.created_by === user.id) return true;
+        if (task.created_by !== user.id) return false;
+        if (Number(user.type_user) === 2 && user.id_brother) {
+            return TaskModel.isGroupLeader(user.id_brother);
+        }
+        return false;
+    }
+
+    static async updateAndAssignTask(taskId: number, taskData: any, editor: TaskCreator) {
+        const task = await TaskModel.findById(taskId);
+        if (!task || task.parent_task_id) {
+            throw new Error('Tarea no encontrada');
+        }
+
+        if (!(await this.userCanEditMasterTask(task, editor))) {
+            throw new Error('No autorizado para editar esta tarea');
+        }
+
+        const role = Number(editor.type_user);
+        const assignedType = parseInt(taskData.assigned_type);
+        const assignedIds = Array.isArray(taskData.assigned_ids)
+            ? taskData.assigned_ids.map((id: number) => Number(id))
+            : [];
+
+        if (role === 2) {
+            if (!editor.id_brother || !(await TaskModel.isGroupLeader(editor.id_brother))) {
+                throw new Error('No autorizado para editar tareas');
+            }
+            await TaskModel.validateLeaderAssignments(
+                editor.id_brother,
+                assignedType,
+                assignedIds
+            );
+        }
+
+        const connection = await pool.getConnection();
+        try {
+            await connection.beginTransaction();
+
+            await TaskModel.updateMaster(
+                taskId,
+                {
+                    title: taskData.title,
+                    content: taskData.content,
+                    priority: taskData.priority || 'medium',
+                    due_date: taskData.due_date ? new Date(taskData.due_date) : null,
+                    is_recurring: !!taskData.is_recurring,
+                    recurrence_rule: taskData.is_recurring ? taskData.recurrence_rule : null,
+                },
+                connection
+            );
+
+            await AttachmentController.extractAndBindImages(taskId, taskData.content);
+
+            const { rows } = await this.buildAssignmentRows(
+                taskId,
+                assignedType,
+                assignedIds,
+                editor.id_brother
+            );
+
+            const replaceRows = rows.map(([tid, type, aid]) => ({
+                assigned_type: type,
+                assigned_id: aid,
+            }));
+
+            await TaskAssignmentModel.replaceForTask(taskId, replaceRows, connection);
+
+            await connection.commit();
+            return taskId;
+        } catch (error) {
+            await connection.rollback();
+            throw error;
+        } finally {
+            connection.release();
+        }
+    }
+
     static async createAndAssignTask(taskData: any, creator: TaskCreator) {
         const role = Number(creator.type_user);
         const assignedType = parseInt(taskData.assigned_type);
@@ -257,26 +380,14 @@ export class TaskService {
 
             const taskId = await TaskModel.create(newTask, connection);
             await AttachmentController.extractAndBindImages(taskId, taskData.content);
-            let assignmentsData: any[][] = [];
-            let notifyType = assignedType;
-            let notifyIds = assignedIds;
 
-            if (assignedType === 0) {
-                assignmentsData.push([taskId, 0, null]);
-            } else if (assignedType === 2 && assignedIds.length > 0) {
-                const brotherIds = await BrotherModel.getBrotherIdsByGroupIds(
+            const { rows: assignmentsData, notifyType, notifyIds } =
+                await this.buildAssignmentRows(
+                    taskId,
+                    assignedType,
                     assignedIds,
-                    creator.id_brother ?? undefined
+                    creator.id_brother
                 );
-                if (brotherIds.length === 0) {
-                    throw new Error('El grupo seleccionado no tiene miembros asignables');
-                }
-                assignmentsData = brotherIds.map((brotherId) => [taskId, 1, brotherId]);
-                notifyType = 1;
-                notifyIds = brotherIds;
-            } else if (assignedIds.length > 0) {
-                assignmentsData = assignedIds.map((id: number) => [taskId, assignedType, id]);
-            }
 
             if (assignmentsData.length > 0) {
                 await TaskAssignmentModel.createMultiple(assignmentsData, connection);

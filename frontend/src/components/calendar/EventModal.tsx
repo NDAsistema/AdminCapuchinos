@@ -48,6 +48,102 @@ const WEEKDAYS = [
   { value: 6, label: "Sáb" },
 ];
 
+const MONTHS_ES = [
+  "enero", "febrero", "marzo", "abril", "mayo", "junio",
+  "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre",
+];
+
+const WEEKDAY_NAMES = [
+  "domingo", "lunes", "martes", "miércoles", "jueves", "viernes", "sábado",
+];
+
+function parseStartDate(startAt: string): Date | null {
+  if (!startAt) return null;
+  const normalized = startAt.includes("T") ? startAt : `${startAt}T12:00:00`;
+  const date = new Date(normalized);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+/** True si la fecha es el último [día de semana] de ese mes (ej. último viernes). */
+function isLastWeekdayOfMonth(date: Date): boolean {
+  const next = new Date(date);
+  next.setDate(date.getDate() + 7);
+  return next.getMonth() !== date.getMonth();
+}
+
+function encodeMonthlyFromStart(startAt: string): string | undefined {
+  const date = parseStartDate(startAt);
+  if (!date) return undefined;
+  if (isLastWeekdayOfMonth(date)) {
+    return `last:${date.getDay()}`;
+  }
+  return String(date.getDate());
+}
+
+function encodeYearlyFromStart(startAt: string): string | undefined {
+  const date = parseStartDate(startAt);
+  if (!date) return undefined;
+  return `${date.getMonth() + 1}-${date.getDate()}`;
+}
+
+function encodeRecurrenceDays(
+  rule: RecurrenceRule,
+  startAt: string,
+  weeklyDays: number[]
+): string | undefined {
+  switch (rule) {
+    case "weekly":
+      return weeklyDays.length ? weeklyDays.join(",") : undefined;
+    case "monthly":
+      return encodeMonthlyFromStart(startAt);
+    case "yearly":
+      return encodeYearlyFromStart(startAt);
+    default:
+      return undefined;
+  }
+}
+
+function getRecurrenceHint(
+  rule: RecurrenceRule,
+  startAt: string,
+  interval: number,
+  recurrenceDays: number[]
+): string {
+  const date = parseStartDate(startAt);
+
+  switch (rule) {
+    case "weekly": {
+      const selectedDays = recurrenceDays
+        .slice()
+        .sort((a, b) => a - b)
+        .map((d) => WEEKDAYS.find((w) => w.value === d)?.label)
+        .filter(Boolean)
+        .join(", ");
+      if (!selectedDays) return "Selecciona al menos un día de la semana.";
+      return interval === 1
+        ? `Se repite cada semana los: ${selectedDays}.`
+        : `Se repite cada ${interval} semanas los: ${selectedDays}.`;
+    }
+    case "monthly":
+      if (!date) return "Indica la fecha de inicio del evento.";
+      if (isLastWeekdayOfMonth(date)) {
+        return `Se repetirá el último ${WEEKDAY_NAMES[date.getDay()]} de cada mes.`;
+      }
+      return `Se repetirá el día ${date.getDate()} de cada mes.`;
+    case "yearly":
+      if (!date) return "Indica la fecha de inicio del evento.";
+      return `Se repetirá cada año el ${date.getDate()} de ${MONTHS_ES[date.getMonth()]}.`;
+    default:
+      return "";
+  }
+}
+
+function resolveWeeklyDays(startAt: string, recurrenceDays: number[]): number[] {
+  if (recurrenceDays.length > 0) return recurrenceDays;
+  const date = parseStartDate(startAt);
+  return date ? [date.getDay()] : [];
+}
+
 function toLocalInput(iso: string, allDay: boolean): string {
   if (!iso) return "";
   const d = new Date(iso.includes("T") ? iso : iso.replace(" ", "T"));
@@ -101,6 +197,20 @@ export default function EventModal({
     []
   );
 
+  const recurrenceHint = useMemo(
+    () => getRecurrenceHint(recurrenceRule, startAt, recurrenceInterval, recurrenceDays),
+    [recurrenceRule, startAt, recurrenceInterval, recurrenceDays]
+  );
+
+  useEffect(() => {
+    if (!isOpen || !isRecurring || recurrenceRule !== "weekly" || !startAt) return;
+    setRecurrenceDays((prev) => {
+      if (prev.length > 0) return prev;
+      const date = parseStartDate(startAt);
+      return date ? [date.getDay()] : prev;
+    });
+  }, [isOpen, isRecurring, recurrenceRule, startAt]);
+
   useEffect(() => {
     if (!isOpen) return;
 
@@ -140,22 +250,38 @@ export default function EventModal({
     );
   };
 
-  const buildPayload = (): EventInput => ({
-    calendar_id: calendarId,
-    title: title.trim(),
-    description: isEmptyHtml(description) ? undefined : description,
-    start_at: toApiDateTime(startAt, allDay),
-    end_at: toApiDateTime(endAt, allDay, true),
-    all_day: allDay,
-    is_recurring: isRecurring,
-    recurrence_rule: isRecurring ? recurrenceRule : undefined,
-    recurrence_interval: isRecurring ? recurrenceInterval : undefined,
-    recurrence_end_date: isRecurring && recurrenceEndDate ? recurrenceEndDate : undefined,
-    recurrence_days: isRecurring && recurrenceRule === "weekly" && recurrenceDays.length
-      ? recurrenceDays.join(",")
-      : undefined,
-    reminders,
-  });
+  const handleRecurrenceRuleChange = (rule: RecurrenceRule) => {
+    setRecurrenceRule(rule);
+    if (rule === "weekly") {
+      const date = parseStartDate(startAt);
+      setRecurrenceDays(date ? [date.getDay()] : []);
+      setRecurrenceInterval(1);
+    } else {
+      setRecurrenceDays([]);
+      setRecurrenceInterval(1);
+    }
+  };
+
+  const buildPayload = (): EventInput => {
+    const weeklyDays = resolveWeeklyDays(startAt, recurrenceDays);
+
+    return {
+      calendar_id: calendarId,
+      title: title.trim(),
+      description: isEmptyHtml(description) ? undefined : description,
+      start_at: toApiDateTime(startAt, allDay),
+      end_at: toApiDateTime(endAt, allDay, true),
+      all_day: allDay,
+      is_recurring: isRecurring,
+      recurrence_rule: isRecurring ? recurrenceRule : undefined,
+      recurrence_interval: isRecurring ? recurrenceInterval : undefined,
+      recurrence_end_date: isRecurring && recurrenceEndDate ? recurrenceEndDate : undefined,
+      recurrence_days: isRecurring
+        ? encodeRecurrenceDays(recurrenceRule, startAt, weeklyDays)
+        : undefined,
+      reminders,
+    };
+  };
 
   const handleSave = async () => {
     if (!title.trim() || !calendarId || !startAt || !endAt) {
@@ -166,6 +292,26 @@ export default function EventModal({
     if (event?.isRecurring && editScope === null) {
       setError("Selecciona si editas solo esta ocurrencia o toda la serie");
       return;
+    }
+
+    if (isRecurring) {
+      if (recurrenceRule === "weekly") {
+        if (recurrenceInterval < 1) {
+          setError("El intervalo debe ser al menos 1");
+          return;
+        }
+        if (resolveWeeklyDays(startAt, recurrenceDays).length === 0) {
+          setError("Selecciona al menos un día de la semana");
+          return;
+        }
+      }
+      if (
+        (recurrenceRule === "monthly" || recurrenceRule === "yearly") &&
+        !parseStartDate(startAt)
+      ) {
+        setError("Indica la fecha de inicio para calcular la repetición");
+        return;
+      }
     }
 
     setSaving(true);
@@ -313,26 +459,76 @@ export default function EventModal({
 
               {isRecurring && (
                 <div className="rounded-lg border border-gray-200 p-3 dark:border-gray-700 space-y-3">
-                  <div className="flex gap-2">
-                    <select value={recurrenceRule} onChange={(e) => setRecurrenceRule(e.target.value as RecurrenceRule)} className="h-9 rounded border px-2 text-sm dark:bg-gray-800 dark:border-gray-700 dark:text-white">
-                      <option value="daily">Diario</option>
-                      <option value="weekly">Semanal</option>
-                      <option value="monthly">Mensual</option>
-                      <option value="yearly">Anual</option>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <label className="text-sm text-gray-600 dark:text-gray-400">Repetir:</label>
+                    <select
+                      value={recurrenceRule}
+                      onChange={(e) => handleRecurrenceRuleChange(e.target.value as RecurrenceRule)}
+                      className="h-9 rounded border px-2 text-sm dark:bg-gray-800 dark:border-gray-700 dark:text-white"
+                    >
+                      <option value="weekly">Por semana</option>
+                      <option value="monthly">Por mes</option>
+                      <option value="yearly">Por año</option>
                     </select>
-                    <input type="number" min={1} value={recurrenceInterval} onChange={(e) => setRecurrenceInterval(Number(e.target.value))} className="h-9 w-20 rounded border px-2 text-sm dark:bg-gray-800 dark:border-gray-700 dark:text-white" />
-                    <span className="self-center text-sm text-gray-500">intervalo</span>
+
+                    {recurrenceRule === "weekly" && (
+                      <>
+                        <span className="text-sm text-gray-600 dark:text-gray-400">— cada</span>
+                        <input
+                          type="number"
+                          min={1}
+                          value={recurrenceInterval}
+                          onChange={(e) =>
+                            setRecurrenceInterval(Math.max(1, Number(e.target.value) || 1))
+                          }
+                          className="h-9 w-20 rounded border px-2 text-sm dark:bg-gray-800 dark:border-gray-700 dark:text-white"
+                        />
+                        <span className="text-sm text-gray-600 dark:text-gray-400">
+                          {recurrenceInterval === 1 ? "semana" : "semanas"}
+                        </span>
+                      </>
+                    )}
                   </div>
+
                   {recurrenceRule === "weekly" && (
-                    <div className="flex flex-wrap gap-1">
-                      {WEEKDAYS.map((d) => (
-                        <button key={d.value} type="button" onClick={() => toggleDay(d.value)} className={`rounded px-2 py-1 text-xs ${recurrenceDays.includes(d.value) ? "bg-brand-500 text-white" : "bg-gray-100 dark:bg-gray-800"}`}>
-                          {d.label}
-                        </button>
-                      ))}
+                    <div>
+                      <p className="mb-2 text-xs text-gray-500 dark:text-gray-400">
+                        Días de la semana:
+                      </p>
+                      <div className="flex flex-wrap gap-1">
+                        {WEEKDAYS.map((d) => (
+                          <button
+                            key={d.value}
+                            type="button"
+                            onClick={() => toggleDay(d.value)}
+                            className={`rounded px-2 py-1 text-xs ${
+                              recurrenceDays.includes(d.value)
+                                ? "bg-brand-500 text-white"
+                                : "bg-gray-100 dark:bg-gray-800"
+                            }`}
+                          >
+                            {d.label}
+                          </button>
+                        ))}
+                      </div>
                     </div>
                   )}
-                  <input type="date" value={recurrenceEndDate} onChange={(e) => setRecurrenceEndDate(e.target.value)} className="h-9 rounded border px-2 text-sm dark:bg-gray-800 dark:border-gray-700 dark:text-white" placeholder="Fin de recurrencia" />
+
+                  <div className="rounded-lg bg-gray-50 px-3 py-2 text-sm text-gray-700 dark:bg-gray-800 dark:text-gray-300">
+                    {recurrenceHint}
+                  </div>
+
+                  <div>
+                    <label className="mb-1 block text-xs text-gray-500 dark:text-gray-400">
+                      Repetir hasta (opcional)
+                    </label>
+                    <input
+                      type="date"
+                      value={recurrenceEndDate}
+                      onChange={(e) => setRecurrenceEndDate(e.target.value)}
+                      className="h-9 w-full rounded border px-2 text-sm dark:bg-gray-800 dark:border-gray-700 dark:text-white"
+                    />
+                  </div>
                 </div>
               )}
             </>

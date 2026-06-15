@@ -35,9 +35,16 @@ const TASK_DETAIL_SELECT = `
             SELECT g.name
             FROM task_assignments ta
             LEFT JOIN \`groups\` g ON ta.assigned_type = 2 AND g.id = ta.assigned_id
-            WHERE ta.task_id = COALESCE(t.parent_task_id, t.id) AND ta.assigned_type = 2
+            WHERE ta.task_id = COALESCE(t.parent_task_id, t.id) AND ta.assigned_type = 2 AND ta.status = 1
             LIMIT 1
-        ) AS groupName
+        ) AS groupName,
+        (
+            SELECT ta.assigned_type
+            FROM task_assignments ta
+            WHERE ta.task_id = COALESCE(t.parent_task_id, t.id) AND ta.status = 1
+            ORDER BY ta.assigned_type ASC
+            LIMIT 1
+        ) AS primary_assigned_type
     FROM tasks t
     LEFT JOIN tasks parent ON parent.id = t.parent_task_id
     LEFT JOIN users creator_u ON creator_u.id = t.created_by
@@ -75,6 +82,35 @@ export class TaskModel {
             [id]
         );
         return rows[0] || null;
+    }
+
+    static async updateMaster(
+        id: number,
+        data: {
+            title: string;
+            content: string;
+            priority: string;
+            due_date: Date | null;
+            is_recurring: boolean;
+            recurrence_rule: string | null;
+        },
+        connection?: any
+    ): Promise<void> {
+        const executor = connection || pool;
+        await executor.execute(
+            `UPDATE tasks SET title = ?, content = ?, priority = ?, due_date = ?,
+             is_recurring = ?, recurrence_rule = ?, updated_at = NOW()
+             WHERE id = ? AND status = 1 AND parent_task_id IS NULL`,
+            [
+                data.title,
+                data.content,
+                data.priority,
+                data.due_date,
+                data.is_recurring ? 1 : 0,
+                data.recurrence_rule,
+                id,
+            ]
+        );
     }
 
     static async findUserReportForParent(parentTaskId: number, userId: number): Promise<any | null> {

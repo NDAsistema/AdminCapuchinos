@@ -66,8 +66,8 @@ export class GroupModel {
         }
     }
     static async findAll() {
-        const result = await pool.query('SELECT g.*, tg.name as type_group_name, h.id as id_home, h.name as home_name, COUNT(rgb.id) as total_members FROM `groups` as g LEFT JOIN type_groups tg on (g.typegroup = tg.id) LEFT JOIN releations_home_groups rhg on (rhg.id_group = g.id) LEFT JOIN homes h on (rhg.id_home = h.id) LEFT JOIN releations_groups_brotthers rgb on (rgb.id_group = g.id AND rgb.status = 1) WHERE g.status = 1 GROUP BY g.id, tg.id, h.id;');
-        return result;
+        const [rows] = await pool.query('SELECT g.*, tg.name as type_group_name, h.id as id_home, h.name as home_name, COUNT(rgb.id) as total_members FROM `groups` as g LEFT JOIN type_groups tg on (g.typegroup = tg.id) LEFT JOIN releations_home_groups rhg on (rhg.id_group = g.id) LEFT JOIN homes h on (rhg.id_home = h.id) LEFT JOIN releations_groups_brotthers rgb on (rgb.id_group = g.id AND rgb.status = 1) WHERE g.status = 1 GROUP BY g.id, tg.id, h.id;');
+        return rows;
     }
 
     static async findById(id: any) {

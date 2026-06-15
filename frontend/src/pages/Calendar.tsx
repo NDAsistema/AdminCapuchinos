@@ -1,16 +1,32 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import FullCalendar from "@fullcalendar/react";
-import dayGridPlugin from "@fullcalendar/daygrid";
-import timeGridPlugin from "@fullcalendar/timegrid";
-import interactionPlugin from "@fullcalendar/interaction";
-import { DateSelectArg, EventClickArg, DatesSetArg } from "@fullcalendar/core";
 import PageMeta from "../components/common/PageMeta";
 import calendarService, { type Calendar } from "../services/calendarService";
 import eventService, { type CalendarEventInstance } from "../services/eventService";
 import CalendarModal from "../components/calendar/CalendarModal";
 import EventModal from "../components/calendar/EventModal";
+import EventDetailModal from "../components/calendar/EventDetailModal";
+import ToastCalendarView, {
+  type ToastCalendarHandle,
+} from "../components/calendar/ToastCalendarView";
 import { usePermissions } from "../hooks/usePermissions";
 import Swal from "sweetalert2";
+
+const MONTHS_ES = [
+  "enero", "febrero", "marzo", "abril", "mayo", "junio",
+  "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre",
+];
+
+function formatTitle(date: Date, view: string): string {
+  if (view === "day") {
+    return date.toLocaleDateString("es-ES", {
+      weekday: "long",
+      day: "numeric",
+      month: "long",
+      year: "numeric",
+    });
+  }
+  return `${MONTHS_ES[date.getMonth()]} de ${date.getFullYear()}`;
+}
 
 const CalendarPage: React.FC = () => {
   const { isAdmin, isCommunications } = usePermissions();
@@ -20,16 +36,20 @@ const CalendarPage: React.FC = () => {
   const [selectedCalendarIds, setSelectedCalendarIds] = useState<number[]>([]);
   const [events, setEvents] = useState<CalendarEventInstance[]>([]);
   const [dateRange, setDateRange] = useState({ start: "", end: "" });
+  const [viewLabel, setViewLabel] = useState("month");
+  const [headerTitle, setHeaderTitle] = useState("");
 
   const [calendarModalOpen, setCalendarModalOpen] = useState(false);
   const [editingCalendar, setEditingCalendar] = useState<Calendar | null>(null);
 
   const [eventModalOpen, setEventModalOpen] = useState(false);
   const [editingEvent, setEditingEvent] = useState<CalendarEventInstance | null>(null);
+  const [detailModalOpen, setDetailModalOpen] = useState(false);
+  const [viewingEvent, setViewingEvent] = useState<CalendarEventInstance | null>(null);
   const [defaultStart, setDefaultStart] = useState("");
   const [defaultEnd, setDefaultEnd] = useState("");
 
-  const calendarRef = useRef<FullCalendar>(null);
+  const toastRef = useRef<ToastCalendarHandle>(null);
 
   const loadCalendars = useCallback(async () => {
     try {
@@ -68,12 +88,17 @@ const CalendarPage: React.FC = () => {
     loadEvents();
   }, [loadEvents]);
 
-  const handleDatesSet = (info: DatesSetArg) => {
-    setDateRange({
-      start: info.startStr.slice(0, 10),
-      end: info.endStr.slice(0, 10),
-    });
-  };
+  const updateHeader = useCallback(() => {
+    const handle = toastRef.current;
+    if (!handle) return;
+    setViewLabel(handle.getViewName());
+    setHeaderTitle(formatTitle(handle.getTitleDate(), handle.getViewName()));
+  }, []);
+
+  const handleRangeChange = useCallback((start: string, end: string) => {
+    setDateRange({ start, end });
+    requestAnimationFrame(updateHeader);
+  }, [updateHeader]);
 
   const toggleCalendar = (id: number) => {
     setSelectedCalendarIds((prev) =>
@@ -104,7 +129,7 @@ const CalendarPage: React.FC = () => {
 
     const manageable = calendars.filter((c) => c.canManage);
     if (manageable.length === 0) {
-      calendarRef.current?.getApi().unselect();
+      toastRef.current?.clearSelection();
       await promptCreateCalendar();
       return;
     }
@@ -115,51 +140,41 @@ const CalendarPage: React.FC = () => {
     setEventModalOpen(true);
   };
 
-  const handleDateSelect = (info: DateSelectArg) => {
-    openNewEvent(info.startStr, info.endStr || info.startStr);
+  const handleSelectRange = (start: string, end: string) => {
+    openNewEvent(start, end || start);
   };
 
-  const handleEventClick = (info: EventClickArg) => {
-    const props = info.event.extendedProps;
-    const instance: CalendarEventInstance = {
-      id: info.event.id,
-      eventId: props.eventId,
-      calendarId: props.calendarId,
-      title: info.event.title,
-      description: props.description,
-      start: info.event.startStr,
-      end: info.event.endStr ?? info.event.startStr,
-      allDay: info.event.allDay,
-      color: info.event.backgroundColor ?? "#465fff",
-      isRecurring: props.isRecurring,
-      isException: props.isException,
-      originalStartAt: props.originalStartAt,
-    };
-    if (canManage && calendars.find((c) => c.id === instance.calendarId)?.canManage) {
+  const handleEventClick = (instance: CalendarEventInstance) => {
+    const calendar = calendars.find((c) => c.id === instance.calendarId);
+    if (canManage && calendar?.canManage) {
       setEditingEvent(instance);
       setEventModalOpen(true);
+      return;
     }
+    setViewingEvent(instance);
+    setDetailModalOpen(true);
   };
 
-  const fcEvents = events.map((e) => ({
-    id: e.id,
-    title: e.title,
-    start: e.start,
-    end: e.end,
-    allDay: e.allDay,
-    backgroundColor: e.color,
-    borderColor: e.color,
-    extendedProps: {
-      eventId: e.eventId,
-      calendarId: e.calendarId,
-      description: e.description,
-      isRecurring: e.isRecurring,
-      isException: e.isException,
-      originalStartAt: e.originalStartAt,
-    },
+  const openEditFromDetail = () => {
+    if (!viewingEvent) return;
+    setDetailModalOpen(false);
+    setEditingEvent(viewingEvent);
+    setEventModalOpen(true);
+  };
+
+  const visibleCalendars = calendars.filter((c) => selectedCalendarIds.includes(c.id));
+  const toastSources = visibleCalendars.map((c) => ({
+    id: String(c.id),
+    name: c.name,
+    color: c.color ?? "#465fff",
   }));
 
   const manageableCalendars = calendars.filter((c) => c.canManage);
+
+  const toolbarBtn =
+    "rounded-lg border border-gray-300 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-800";
+  const toolbarBtnActive =
+    "rounded-lg bg-brand-500 px-3 py-1.5 text-sm text-white hover:bg-brand-600";
 
   return (
     <>
@@ -214,33 +229,54 @@ const CalendarPage: React.FC = () => {
         </aside>
 
         <div className="flex-1 rounded-2xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03]">
-          <div className="custom-calendar">
-            <FullCalendar
-              ref={calendarRef}
-              plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
-              initialView="dayGridMonth"
-              locale="es"
-              headerToolbar={{
-                left: "prev,next today",
-                center: "title",
-                right: canManage ? "dayGridMonth,timeGridWeek,timeGridDay addEventButton" : "dayGridMonth,timeGridWeek,timeGridDay",
-              }}
-              customButtons={
-                canManage
-                  ? {
-                      addEventButton: {
-                        text: "Nuevo evento",
-                        click: () => openNewEvent(),
-                      },
-                    }
-                  : undefined
-              }
-              events={fcEvents}
-              selectable={canManage}
-              select={handleDateSelect}
-              eventClick={handleEventClick}
-              datesSet={handleDatesSet}
-              height="auto"
+          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-gray-200 px-4 py-3 dark:border-gray-800">
+            <div className="flex items-center gap-2">
+              <button type="button" className={toolbarBtn} onClick={() => toastRef.current?.prev()}>
+                ‹
+              </button>
+              <button type="button" className={toolbarBtn} onClick={() => toastRef.current?.next()}>
+                ›
+              </button>
+              <button type="button" className={toolbarBtn} onClick={() => toastRef.current?.today()}>
+                Hoy
+              </button>
+              <span className="ml-2 text-base font-semibold capitalize text-gray-800 dark:text-white">
+                {headerTitle}
+              </span>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2">
+              {(["month", "week", "day"] as const).map((v) => (
+                <button
+                  key={v}
+                  type="button"
+                  className={viewLabel === v ? toolbarBtnActive : toolbarBtn}
+                  onClick={() => toastRef.current?.changeView(v)}
+                >
+                  {v === "month" ? "Mes" : v === "week" ? "Semana" : "Día"}
+                </button>
+              ))}
+              {canManage && (
+                <button
+                  type="button"
+                  className={toolbarBtnActive}
+                  onClick={() => openNewEvent()}
+                >
+                  Nuevo evento
+                </button>
+              )}
+            </div>
+          </div>
+
+          <div className="p-2">
+            <ToastCalendarView
+              ref={toastRef}
+              calendarSources={toastSources}
+              events={events}
+              canManage={canManage}
+              onRangeChange={handleRangeChange}
+              onEventClick={handleEventClick}
+              onSelectRange={handleSelectRange}
             />
           </div>
         </div>
@@ -261,6 +297,27 @@ const CalendarPage: React.FC = () => {
         defaultEnd={defaultEnd}
         onClose={() => setEventModalOpen(false)}
         onSuccess={loadEvents}
+      />
+
+      <EventDetailModal
+        isOpen={detailModalOpen}
+        event={viewingEvent}
+        calendarName={
+          viewingEvent?.calendarName ??
+          calendars.find((c) => c.id === viewingEvent?.calendarId)?.name
+        }
+        calendarColor={
+          viewingEvent?.color ??
+          calendars.find((c) => c.id === viewingEvent?.calendarId)?.color ??
+          "#465fff"
+        }
+        canEdit={
+          !!viewingEvent &&
+          canManage &&
+          !!calendars.find((c) => c.id === viewingEvent.calendarId)?.canManage
+        }
+        onEdit={openEditFromDetail}
+        onClose={() => setDetailModalOpen(false)}
       />
     </>
   );

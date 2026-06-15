@@ -88,4 +88,16 @@ export class TaskController {
             res.status(status).json({ success: false, message: error.message });
         }
     }
+
+    static async updateTask(req: Request, res: Response) {
+        try {
+            const editor = AuthHelper.getAuthenticatedUser(req);
+            const taskId = Number(req.params.id);
+            await TaskService.updateAndAssignTask(taskId, req.body, editor);
+            res.json({ success: true, message: 'Tarea actualizada' });
+        } catch (error: any) {
+            const status = error.message?.includes('autorizado') ? 403 : 400;
+            res.status(status).json({ success: false, message: error.message });
+        }
+    }
 }

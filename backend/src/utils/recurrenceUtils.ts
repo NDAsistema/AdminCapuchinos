@@ -30,6 +30,64 @@ function frequencyFromRule(rule: RecurrenceRule): Frequency {
     }
 }
 
+function isLastWeekdayOfMonth(date: Date): boolean {
+    const next = new Date(date);
+    next.setDate(date.getDate() + 7);
+    return next.getMonth() !== date.getMonth();
+}
+
+function applyMonthlyRecurrence(
+    options: Partial<import('rrule').Options>,
+    recurrenceDays: string | null | undefined,
+    dtstart: Date
+) {
+    const trimmed = recurrenceDays?.trim();
+
+    if (trimmed?.startsWith('last:')) {
+        const weekday = Number(trimmed.split(':')[1]);
+        if (weekday >= 0 && weekday <= 6) {
+            options.byweekday = [WEEKDAY_MAP[weekday]];
+            options.bysetpos = -1;
+        }
+        return;
+    }
+
+    if (trimmed) {
+        const dayOfMonth = Number(trimmed);
+        if (dayOfMonth >= 1 && dayOfMonth <= 31) {
+            options.bymonthday = [dayOfMonth];
+        }
+        return;
+    }
+
+    if (isLastWeekdayOfMonth(dtstart)) {
+        options.byweekday = [WEEKDAY_MAP[dtstart.getDay()]];
+        options.bysetpos = -1;
+    } else {
+        options.bymonthday = [dtstart.getDate()];
+    }
+}
+
+function applyYearlyRecurrence(
+    options: Partial<import('rrule').Options>,
+    recurrenceDays: string | null | undefined,
+    dtstart: Date
+) {
+    const trimmed = recurrenceDays?.trim();
+
+    if (trimmed && /^\d+-\d+$/.test(trimmed)) {
+        const [month, day] = trimmed.split('-').map(Number);
+        if (month >= 1 && month <= 12 && day >= 1 && day <= 31) {
+            options.bymonth = [month];
+            options.bymonthday = [day];
+            return;
+        }
+    }
+
+    options.bymonth = [dtstart.getMonth() + 1];
+    options.bymonthday = [dtstart.getDate()];
+}
+
 export interface ExpandedOccurrence {
     originalStartAt: string;
     startAt: string;
@@ -76,6 +134,14 @@ export function expandEventOccurrences(
         if (days.length > 0) {
             options.byweekday = days;
         }
+    }
+
+    if (master.recurrence_rule === 'monthly') {
+        applyMonthlyRecurrence(options, master.recurrence_days, start);
+    }
+
+    if (master.recurrence_rule === 'yearly') {
+        applyYearlyRecurrence(options, master.recurrence_days, start);
     }
 
     const rule = new RRule(options);

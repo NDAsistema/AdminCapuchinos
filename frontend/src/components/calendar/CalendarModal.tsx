@@ -32,6 +32,7 @@ interface Props {
 }
 
 type AssignmentRow = { assigned_type: number; assigned_id: number; label: string };
+type GroupOption = { id: number; name: string };
 
 const ASSIGNMENT_TYPES = [
   { value: 0, label: "Todos" },
@@ -49,7 +50,7 @@ export default function CalendarModal({ isOpen, calendar, onClose, onSuccess }: 
   const [assignTargetId, setAssignTargetId] = useState(0);
   const [assignments, setAssignments] = useState<AssignmentRow[]>([]);
   const [homes, setHomes] = useState<{ id: number; name: string }[]>([]);
-  const [groups, setGroups] = useState<{ id: number; name: string }[]>([]);
+  const [groups, setGroups] = useState<GroupOption[]>([]);
   const [brothers, setBrothers] = useState<{ id: number; name: string }[]>([]);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -94,18 +95,34 @@ export default function CalendarModal({ isOpen, calendar, onClose, onSuccess }: 
     setEditorKey((k) => k + 1);
   }, [isOpen, calendar]);
 
+  const normalizeGroups = (groupsData: unknown, forComms: boolean): GroupOption[] => {
+    let list = groupsData;
+    if (Array.isArray(list) && Array.isArray(list[0])) {
+      list = list[0];
+    }
+    if (!Array.isArray(list)) return [];
+
+    return list.map((g: any) => ({
+      id: g.id,
+      name: forComms && g.home_name
+        ? `${g.name} (${g.home_name})`
+        : g.name || g.home_name || `Grupo ${g.id}`,
+    }));
+  };
+
   const loadOptions = async () => {
     try {
       const homesData = await homeService.getAllHomes();
       setHomes(homesData.map((h: any) => ({ id: h.id, name: h.name })));
 
-      const groupsData = isCommunications && !isAdmin
+      const forComms = isCommunications && !isAdmin;
+      const groupsData = forComms
         ? await GroupService.findGroupsForCommunicationUser()
-        : await GroupService.getAllGroups();
-      setGroups((Array.isArray(groupsData) ? groupsData : []).map((g: any) => ({ id: g.id, name: g.name })));
+        : await GroupService.getAll();
+      setGroups(normalizeGroups(groupsData, forComms));
 
       const brothersData = await brotherService.getAllBrothers();
-      setBrothers((brothersData ?? []).map((b: any) => ({ id: b.id, name: b.name })));
+      setBrothers((brothersData ?? []).map((b: any) => ({ id: b.id, name: b.name_brother || b.name || `Usuario ${b.id}` })));
     } catch (err) {
       console.error(err);
     }
@@ -196,9 +213,18 @@ export default function CalendarModal({ isOpen, calendar, onClose, onSuccess }: 
               />
             </div>
           </div>
+
           <div>
-            <label className="mb-1 block text-sm text-gray-600 dark:text-gray-400">Color</label>
-            <input type="color" value={color} onChange={(e) => setColor(e.target.value)} className="h-10 w-20" />
+            <label className="mb-1 block text-sm text-gray-600 dark:text-gray-400">Color del calendario</label>
+            <p className="mb-2 text-xs text-gray-500 dark:text-gray-400">
+              Los eventos de este calendario se mostrarán con este color.
+            </p>
+            <input
+              type="color"
+              value={color}
+              onChange={(e) => setColor(e.target.value)}
+              className="h-10 w-20 cursor-pointer rounded border border-gray-300 dark:border-gray-700"
+            />
           </div>
 
           <div>

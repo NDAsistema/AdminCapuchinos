@@ -16,7 +16,26 @@ interface CalendarInput {
     assignments?: { assigned_type: number; assigned_id: number }[];
 }
 
+const CALENDAR_COLOR_PALETTE = [
+    '#465fff',
+    '#10b981',
+    '#f59e0b',
+    '#ef4444',
+    '#8b5cf6',
+    '#06b6d4',
+    '#ec4899',
+    '#14b8a6',
+];
+
 export class CalendarService {
+    private static async pickDefaultColor(): Promise<string> {
+        const [rows]: any = await pool.query(
+            'SELECT COUNT(*) AS cnt FROM calendars WHERE status = 1'
+        );
+        const cnt = Number(rows[0]?.cnt ?? 0);
+        return CALENDAR_COLOR_PALETTE[cnt % CALENDAR_COLOR_PALETTE.length];
+    }
+
     static canManage(user: AuthUser): boolean {
         return user.type_user === 1 || user.type_user === 3;
     }
@@ -86,11 +105,13 @@ export class CalendarService {
         try {
             await connection.beginTransaction();
 
+            const calendarColor = data.color || (await this.pickDefaultColor());
+
             const calendarId = await CalendarModel.create(
                 {
                     name: data.name.trim(),
                     description: data.description || null,
-                    color: data.color || '#465fff',
+                    color: calendarColor,
                     created_by: user.id,
                 },
                 connection
