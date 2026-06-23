@@ -99,7 +99,16 @@ export class CalendarService {
 
         const assignments = data.assignments?.length
             ? data.assignments
-            : [{ assigned_type: 0, assigned_id: 0 }];
+            : user.type_user === 1
+                ? [{ assigned_type: 0, assigned_id: 0 }]
+                : [];
+
+        if (user.type_user === 3) {
+            if (!user.id_brother) {
+                throw new Error('No autorizado para crear calendarios');
+            }
+            await CalendarModel.validateCommsAssignments(user.id_brother, assignments);
+        }
 
         const connection = await pool.getConnection();
         try {
@@ -156,6 +165,12 @@ export class CalendarService {
             );
 
             if (data.assignments) {
+                if (user.type_user === 3) {
+                    if (!user.id_brother) {
+                        throw new Error('No autorizado');
+                    }
+                    await CalendarModel.validateCommsAssignments(user.id_brother, data.assignments);
+                }
                 await CalendarAssignmentModel.replaceAll(calendarId, data.assignments, connection);
             }
 

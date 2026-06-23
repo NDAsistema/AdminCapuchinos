@@ -210,8 +210,7 @@ export class CalendarModel {
             `SELECT 1 FROM calendars c
              WHERE c.id = ? AND c.status = 1
                AND (
-                 c.created_by = ?
-                 OR EXISTS (
+                 EXISTS (
                     SELECT 1 FROM calendar_assignments ca
                     INNER JOIN homes h ON h.id = ca.assigned_id AND h.status = 1
                     WHERE ca.calendar_id = c.id AND ca.status = 1
@@ -226,8 +225,52 @@ export class CalendarModel {
                  )
                )
              LIMIT 1`,
-            [calendarId, userId, brotherId, brotherId]
+            [calendarId, brotherId, brotherId]
         );
         return rows.length > 0;
+    }
+
+    static async validateCommsAssignments(
+        brotherId: number,
+        assignments: { assigned_type: number; assigned_id: number }[]
+    ): Promise<void> {
+        if (!assignments.length) {
+            throw new Error('Debes asignar el calendario a al menos una fraternidad o grupo de tu alcance');
+        }
+
+        for (const assignment of assignments) {
+            if (assignment.assigned_type === 0 || assignment.assigned_type === 3) {
+                throw new Error('Solo puedes asignar calendarios a fraternidades o grupos de tu alcance');
+            }
+
+            if (assignment.assigned_type === 1) {
+                const [rows]: any = await pool.execute(
+                    `SELECT 1 FROM homes
+                     WHERE id = ? AND status = 1 AND communication_user = ?
+                     LIMIT 1`,
+                    [assignment.assigned_id, brotherId]
+                );
+                if (!rows.length) {
+                    throw new Error('Fraternidad fuera de tu alcance');
+                }
+                continue;
+            }
+
+            if (assignment.assigned_type === 2) {
+                const [rows]: any = await pool.execute(
+                    `SELECT 1 FROM releations_home_groups rhg
+                     INNER JOIN homes h ON h.id = rhg.id_home AND h.status = 1
+                     WHERE rhg.id_group = ? AND h.communication_user = ?
+                     LIMIT 1`,
+                    [assignment.assigned_id, brotherId]
+                );
+                if (!rows.length) {
+                    throw new Error('Grupo fuera de tu alcance');
+                }
+                continue;
+            }
+
+            throw new Error('Tipo de asignación no válido');
+        }
     }
 }

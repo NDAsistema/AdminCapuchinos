@@ -41,8 +41,12 @@ const ASSIGNMENT_TYPES = [
   { value: 3, label: "Usuario" },
 ];
 
+const COMMS_ASSIGNMENT_TYPES = ASSIGNMENT_TYPES.filter((t) => t.value === 1 || t.value === 2);
+
 export default function CalendarModal({ isOpen, calendar, onClose, onSuccess }: Props) {
   const { isAdmin, isCommunications } = usePermissions();
+  const forComms = isCommunications && !isAdmin;
+  const assignmentTypes = forComms ? COMMS_ASSIGNMENT_TYPES : ASSIGNMENT_TYPES;
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [color, setColor] = useState("#465fff");
@@ -55,6 +59,7 @@ export default function CalendarModal({ isOpen, calendar, onClose, onSuccess }: 
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [editorKey, setEditorKey] = useState(0);
+  const [canManageCalendar, setCanManageCalendar] = useState(false);
 
   const froalaConfig = useMemo(
     () => getFroalaEditorConfig("Escriba la descripción del calendario aquí..."),
@@ -64,6 +69,8 @@ export default function CalendarModal({ isOpen, calendar, onClose, onSuccess }: 
   useEffect(() => {
     if (!isOpen) return;
     setError("");
+    setAssignType(forComms ? 1 : 0);
+    setAssignTargetId(0);
     loadOptions();
 
     const loadCalendar = async () => {
@@ -73,11 +80,12 @@ export default function CalendarModal({ isOpen, calendar, onClose, onSuccess }: 
           setName(full.name ?? "");
           setDescription(full.description ?? "");
           setColor(full.color ?? "#465fff");
+          setCanManageCalendar(!!full.canManage);
           setAssignments(
             (full.assignments ?? []).map((a) => ({
               assigned_type: a.assigned_type,
               assigned_id: a.assigned_id,
-              label: a.assigned_name ?? ASSIGNMENT_TYPES.find((t) => t.value === a.assigned_type)?.label ?? "",
+              label: a.assigned_name ?? assignmentTypes.find((t) => t.value === a.assigned_type)?.label ?? "",
             }))
           );
           return;
@@ -85,6 +93,7 @@ export default function CalendarModal({ isOpen, calendar, onClose, onSuccess }: 
           /* fallback below */
         }
       }
+      setCanManageCalendar(!calendar || !!calendar.canManage);
       setName(calendar?.name ?? "");
       setDescription(calendar?.description ?? "");
       setColor(calendar?.color ?? "#465fff");
@@ -93,7 +102,7 @@ export default function CalendarModal({ isOpen, calendar, onClose, onSuccess }: 
 
     loadCalendar();
     setEditorKey((k) => k + 1);
-  }, [isOpen, calendar]);
+  }, [isOpen, calendar, forComms]);
 
   const normalizeGroups = (groupsData: unknown, forComms: boolean): GroupOption[] => {
     let list = groupsData;
@@ -112,17 +121,22 @@ export default function CalendarModal({ isOpen, calendar, onClose, onSuccess }: 
 
   const loadOptions = async () => {
     try {
-      const homesData = await homeService.getAllHomes();
+      const homesData = forComms
+        ? await homeService.findHomesForCommunicationUser()
+        : await homeService.getAllHomes();
       setHomes(homesData.map((h: any) => ({ id: h.id, name: h.name })));
 
-      const forComms = isCommunications && !isAdmin;
       const groupsData = forComms
         ? await GroupService.findGroupsForCommunicationUser()
         : await GroupService.getAll();
       setGroups(normalizeGroups(groupsData, forComms));
 
-      const brothersData = await brotherService.getAllBrothers();
-      setBrothers((brothersData ?? []).map((b: any) => ({ id: b.id, name: b.name_brother || b.name || `Usuario ${b.id}` })));
+      if (!forComms) {
+        const brothersData = await brotherService.getAllBrothers();
+        setBrothers((brothersData ?? []).map((b: any) => ({ id: b.id, name: b.name_brother || b.name || `Usuario ${b.id}` })));
+      } else {
+        setBrothers([]);
+      }
     } catch (err) {
       console.error(err);
     }
@@ -154,6 +168,10 @@ export default function CalendarModal({ isOpen, calendar, onClose, onSuccess }: 
       setError("El nombre es requerido");
       return;
     }
+    if (forComms && assignments.length === 0) {
+      setError("Debes asignar el calendario a al menos una fraternidad o grupo de tu alcance");
+      return;
+    }
     const emptyHtml = !description || description === "<p><br></p>" || description === "<p></p>";
     const payload: CalendarInput = {
       name: name.trim(),
@@ -175,6 +193,22 @@ export default function CalendarModal({ isOpen, calendar, onClose, onSuccess }: 
       onClose();
     } catch (err: any) {
       setError(err.response?.data?.message ?? "Error al guardar");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!calendar?.id || !canManageCalendar) return;
+    if (!window.confirm("¿Eliminar este calendario y todos sus eventos?")) return;
+    setSaving(true);
+    setError("");
+    try {
+      await calendarService.delete(calendar.id);
+      onSuccess();
+      onClose();
+    } catch (err: any) {
+      setError(err.response?.data?.message ?? "Error al eliminar");
     } finally {
       setSaving(false);
     }
@@ -229,13 +263,21 @@ export default function CalendarModal({ isOpen, calendar, onClose, onSuccess }: 
 
           <div>
             <label className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">Asignaciones</label>
+            {forComms && (
+              <p className="mb-2 text-xs text-gray-500 dark:text-gray-400">
+                Solo puedes asignar a fraternidades que administras y grupos de esas fraternidades.
+              </p>
+            )}
             <div className="flex flex-wrap gap-2">
               <select
                 value={assignType}
-                onChange={(e) => setAssignType(Number(e.target.value))}
+                onChange={(e) => {
+                  setAssignType(Number(e.target.value));
+                  setAssignTargetId(0);
+                }}
                 className="h-9 rounded-lg border border-gray-300 px-2 text-sm dark:border-gray-700 dark:bg-gray-800 dark:text-white"
               >
-                {ASSIGNMENT_TYPES.map((t) => (
+                {assignmentTypes.map((t) => (
                   <option key={t.value} value={t.value}>{t.label}</option>
                 ))}
               </select>
@@ -280,7 +322,7 @@ export default function CalendarModal({ isOpen, calendar, onClose, onSuccess }: 
             <ul className="mt-2 space-y-1">
               {assignments.map((a, i) => (
                 <li key={i} className="flex items-center justify-between rounded bg-gray-50 px-2 py-1 text-sm dark:bg-gray-800">
-                  <span>{ASSIGNMENT_TYPES.find((t) => t.value === a.assigned_type)?.label}: {a.label}</span>
+                  <span>{assignmentTypes.find((t) => t.value === a.assigned_type)?.label}: {a.label}</span>
                   <button type="button" onClick={() => removeAssignment(i)} className="text-red-500">×</button>
                 </li>
               ))}
@@ -290,7 +332,20 @@ export default function CalendarModal({ isOpen, calendar, onClose, onSuccess }: 
           {error && <p className="text-sm text-red-500">{error}</p>}
         </div>
 
-        <div className="mt-6 flex justify-end gap-2">
+        <div className="mt-6 flex justify-between gap-2">
+          <div>
+            {calendar?.id && canManageCalendar && (
+              <button
+                type="button"
+                onClick={handleDelete}
+                disabled={saving}
+                className="rounded-lg border border-red-300 px-4 py-2 text-sm text-red-600 disabled:opacity-50"
+              >
+                Eliminar
+              </button>
+            )}
+          </div>
+          <div className="flex gap-2">
           <button type="button" onClick={onClose} className="rounded-lg border px-4 py-2 text-sm dark:border-gray-700 dark:text-gray-300">
             Cancelar
           </button>
@@ -302,6 +357,7 @@ export default function CalendarModal({ isOpen, calendar, onClose, onSuccess }: 
           >
             {saving ? "Guardando..." : "Guardar"}
           </button>
+          </div>
         </div>
       </div>
     </div>

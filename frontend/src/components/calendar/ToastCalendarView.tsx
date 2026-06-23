@@ -49,6 +49,19 @@ function toTzDate(value: string): Date {
   return new Date(normalized);
 }
 
+function syncCalendarHeight(el: HTMLElement, view: "month" | "week" | "day"): number {
+  const width = el.clientWidth;
+  if (width <= 0) return 720;
+
+  if (view === "month") {
+    const cellWidth = width / 7;
+    return Math.round(Math.max(600, cellWidth * 6 + 31));
+  }
+
+  const viewportHeight = window.innerHeight - 220;
+  return Math.round(Math.max(600, Math.min(900, viewportHeight)));
+}
+
 const ToastCalendarView = forwardRef<ToastCalendarHandle, Props>(function ToastCalendarView(
   { calendarSources, events, canManage, onRangeChange, onEventClick, onSelectRange },
   ref
@@ -81,7 +94,12 @@ const ToastCalendarView = forwardRef<ToastCalendarHandle, Props>(function ToastC
       notifyRange();
     },
     changeView: (view) => {
-      calendarRef.current?.changeView(view);
+      const instance = calendarRef.current;
+      const el = containerRef.current;
+      if (!instance || !el) return;
+      instance.changeView(view);
+      el.style.height = `${syncCalendarHeight(el, view)}px`;
+      requestAnimationFrame(() => instance.render());
       notifyRange();
     },
     getViewName: () => calendarRef.current?.getViewName() ?? "month",
@@ -147,19 +165,23 @@ const ToastCalendarView = forwardRef<ToastCalendarHandle, Props>(function ToastC
 
     notifyRange();
 
-    const rerender = () => {
+    const syncLayout = () => {
+      const el = containerRef.current;
+      if (!el) return;
+      const view = instance.getViewName();
+      el.style.height = `${syncCalendarHeight(el, view)}px`;
       requestAnimationFrame(() => instance.render());
     };
 
-    rerender();
+    syncLayout();
 
-    const resizeObserver = new ResizeObserver(rerender);
+    const resizeObserver = new ResizeObserver(syncLayout);
     resizeObserver.observe(containerRef.current);
-    window.addEventListener("resize", rerender);
+    window.addEventListener("resize", syncLayout);
 
     return () => {
       resizeObserver.disconnect();
-      window.removeEventListener("resize", rerender);
+      window.removeEventListener("resize", syncLayout);
       instance.destroy();
       calendarRef.current = null;
     };
@@ -216,7 +238,7 @@ const ToastCalendarView = forwardRef<ToastCalendarHandle, Props>(function ToastC
   return (
     <div
       ref={containerRef}
-      className="toast-calendar-capuchinos h-[720px] w-full"
+      className="toast-calendar-capuchinos w-full"
     />
   );
 });

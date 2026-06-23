@@ -30,7 +30,6 @@ function formatTitle(date: Date, view: string): string {
 
 const CalendarPage: React.FC = () => {
   const { isAdmin, isCommunications } = usePermissions();
-  const canManage = isAdmin || isCommunications;
 
   const [calendars, setCalendars] = useState<Calendar[]>([]);
   const [selectedCalendarIds, setSelectedCalendarIds] = useState<number[]>([]);
@@ -125,7 +124,7 @@ const CalendarPage: React.FC = () => {
   };
 
   const openNewEvent = async (start?: string, end?: string) => {
-    if (!canManage) return;
+    if (!canManageEvents) return;
 
     const manageable = calendars.filter((c) => c.canManage);
     if (manageable.length === 0) {
@@ -146,7 +145,7 @@ const CalendarPage: React.FC = () => {
 
   const handleEventClick = (instance: CalendarEventInstance) => {
     const calendar = calendars.find((c) => c.id === instance.calendarId);
-    if (canManage && calendar?.canManage) {
+    if (canManageEvents && calendar?.canManage) {
       setEditingEvent(instance);
       setEventModalOpen(true);
       return;
@@ -170,6 +169,8 @@ const CalendarPage: React.FC = () => {
   }));
 
   const manageableCalendars = calendars.filter((c) => c.canManage);
+  const canManageEvents = isAdmin || manageableCalendars.length > 0;
+  const canCreateCalendar = isAdmin || isCommunications;
 
   const toolbarBtn =
     "rounded-lg border border-gray-300 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-800";
@@ -184,7 +185,7 @@ const CalendarPage: React.FC = () => {
         <aside className="w-full shrink-0 rounded-2xl border border-gray-200 bg-white p-4 dark:border-gray-800 dark:bg-white/[0.03] xl:w-64">
           <div className="mb-4 flex items-center justify-between">
             <h3 className="font-semibold text-gray-800 dark:text-white">Calendarios</h3>
-            {canManage && (
+            {canCreateCalendar && (
               <button
                 type="button"
                 onClick={() => { setEditingCalendar(null); setCalendarModalOpen(true); }}
@@ -256,7 +257,7 @@ const CalendarPage: React.FC = () => {
                   {v === "month" ? "Mes" : v === "week" ? "Semana" : "Día"}
                 </button>
               ))}
-              {canManage && (
+              {canManageEvents && (
                 <button
                   type="button"
                   className={toolbarBtnActive}
@@ -273,7 +274,7 @@ const CalendarPage: React.FC = () => {
               ref={toastRef}
               calendarSources={toastSources}
               events={events}
-              canManage={canManage}
+              canManage={canManageEvents}
               onRangeChange={handleRangeChange}
               onEventClick={handleEventClick}
               onSelectRange={handleSelectRange}
@@ -292,7 +293,7 @@ const CalendarPage: React.FC = () => {
       <EventModal
         isOpen={eventModalOpen}
         event={editingEvent}
-        calendars={manageableCalendars.length ? manageableCalendars : calendars}
+        calendars={manageableCalendars}
         defaultStart={defaultStart}
         defaultEnd={defaultEnd}
         onClose={() => setEventModalOpen(false)}
@@ -313,7 +314,7 @@ const CalendarPage: React.FC = () => {
         }
         canEdit={
           !!viewingEvent &&
-          canManage &&
+          canManageEvents &&
           !!calendars.find((c) => c.id === viewingEvent.calendarId)?.canManage
         }
         onEdit={openEditFromDetail}

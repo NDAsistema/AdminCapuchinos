@@ -5,6 +5,7 @@ import { HomeController } from '../controllers/HomeController';
 const router = Router();
 
 router.post('/', HomeController.create);
+router.get('/forCommunicationUser', HomeController.findForCommunicationUser);
 router.get('/', HomeController.getAll);
 router.get('/:id', HomeController.getById);
 router.put('/:id', HomeController.update);

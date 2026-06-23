@@ -54,6 +54,16 @@ class HomeService {
         }
     }
 
+    async findHomesForCommunicationUser(): Promise<Home[]> {
+        try {
+            const response = await api.get('/home/forCommunicationUser');
+            return response.data.success ? response.data.data : [];
+        } catch (error: any) {
+            console.error('❌ Error obteniendo fraternidades para comunicaciones:', error.message);
+            return [];
+        }
+    }
+
     async createHome(homeData: any): Promise<any> {
         try {
             const response = await api.post('/home', homeData);

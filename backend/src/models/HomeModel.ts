@@ -96,6 +96,17 @@ export class HomeModel {
         }
     }
     
+    static async findByCommunicationBrother(brotherId: number): Promise<{ id: number; name: string }[]> {
+        const [rows]: any = await pool.execute(
+            `SELECT h.id, h.name
+             FROM homes h
+             WHERE h.status = 1 AND h.communication_user = ?
+             ORDER BY h.name ASC`,
+            [brotherId]
+        );
+        return rows;
+    }
+
     // Obtener fraternidad por ID
     static async findById(id: number): Promise<Home | null> {
         try {
