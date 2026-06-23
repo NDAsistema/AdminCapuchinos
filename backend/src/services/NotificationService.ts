@@ -1,5 +1,6 @@
 import { pool } from '../config/database';
 import { NotificationModel } from '../models/NotificationModel';
+import { EventReminderService } from './EventReminderService';
 
 export class NotificationService {
     /**
@@ -141,5 +142,32 @@ export class NotificationService {
                 message,
             },
         ]);
+    }
+
+    static async notifyEventCreated(params: {
+        eventId: number;
+        title: string;
+        calendarId: number;
+        creatorUserId: number;
+        creatorName?: string;
+        connection?: any;
+    }): Promise<void> {
+        const recipientIds = await EventReminderService.resolveCalendarRecipientUserIds(
+            params.calendarId,
+            params.creatorUserId
+        );
+        if (recipientIds.length === 0) return;
+
+        const author = params.creatorName?.trim() || 'El sistema';
+        const message = `${author} creó el evento: ${params.title}`.slice(0, 500);
+
+        const rows = recipientIds.map((userId) => ({
+            user_id: userId,
+            type: 'event_created',
+            reference_id: params.eventId,
+            message,
+        }));
+
+        await NotificationModel.createMany(rows, params.connection);
     }
 }

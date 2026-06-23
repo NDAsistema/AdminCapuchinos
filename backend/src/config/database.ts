@@ -1,4 +1,6 @@
 import mysql from 'mysql2/promise';
+import fs from 'fs';
+import path from 'path';
 import dotenv from 'dotenv';
 
 dotenv.config();
@@ -47,10 +49,40 @@ export const initializeDatabase = async () => {
     
     await tempConnection.end();
 
-    // Aquí luego agregaremos la creación de tablas
+    await runCalendarMigrations();
     console.log('🎉 Base de datos inicializada correctamente');
   } catch (error) {
     console.error('❌ Error inicializando la base de datos:', error);
     throw error;
   }
 };
+
+async function runCalendarMigrations() {
+  const migrationsDir = path.join(__dirname, '../../migrations');
+  if (!fs.existsSync(migrationsDir)) return;
+
+  const files = fs
+    .readdirSync(migrationsDir)
+    .filter((f) => f.endsWith('.sql'))
+    .sort();
+
+  for (const file of files) {
+    const sql = fs.readFileSync(path.join(migrationsDir, file), 'utf8');
+    const statements = sql
+      .split(';')
+      .map((s) => s.trim())
+      .filter((s) => s.length > 0 && !s.startsWith('--'));
+
+    for (const statement of statements) {
+      try {
+        await pool.execute(statement);
+      } catch (err: any) {
+        const msg = err.message ?? '';
+        if (!msg.includes('already exists') && !msg.includes("check that column/key exists")) {
+          console.warn(`Migración ${file}:`, msg);
+        }
+      }
+    }
+  }
+  console.log('✅ Tablas de calendarios/eventos verificadas');
+}

@@ -817,3 +817,28 @@ span.flatpickr-weekday,
 .swal2-container{
   z-index: 100000000000000000000000001;
 }
+
+.toast-calendar-capuchinos {
+  font-family: inherit;
+  min-height: 600px;
+  position: relative;
+}
+
+.toast-calendar-capuchinos .toastui-calendar-layout,
+.toast-calendar-capuchinos .toastui-calendar-month {
+  height: 100%;
+}
+
+.toast-calendar-capuchinos .toastui-calendar-month-dayname,
+.toast-calendar-capuchinos .toastui-calendar-weekday-grid-date,
+.toast-calendar-capuchinos .toastui-calendar-timegrid-time {
+  font-size: 0.8rem;
+}
+
+.toast-calendar-capuchinos .toastui-calendar-template-time {
+  font-weight: 600;
+}
+
+.dark .toast-calendar-capuchinos {
+  color-scheme: dark;
+}

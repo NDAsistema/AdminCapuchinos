@@ -48,6 +48,14 @@ function ReviewBadge({ status, hasReport }: { status?: string | null; hasReport?
   );
 }
 
+function getRecipientLabel(task: any): string {
+  const type = Number(task.primary_assigned_type);
+  if (type === 0) return "General";
+  if (type === 1) return "Personal";
+  if (type === 2) return task.groupName || "Grupo";
+  return task.groupName || "General";
+}
+
 export function TaskTable({
   view,
   tasks,
@@ -116,7 +124,7 @@ export function TaskTable({
                     </div>
                   ) : (
                     <span className="px-2 py-1 rounded-lg bg-blue-50 text-blue-600 text-[11px] font-bold">
-                      {task.groupName || "General"}
+                      {getRecipientLabel(task)}
                     </span>
                   )}
                 </td>

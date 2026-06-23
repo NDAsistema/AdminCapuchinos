@@ -53,8 +53,8 @@ export default function App() {
                 <Route path="/Usuarios" element={<Users />} />
                 <Route path="/Noticias" element={<Newspaper />} />
                 <Route path="/Tareas" element={<Tasks />} />
+                <Route path="/Calendario" element={<Calendar />} />
                 <Route path="/profile" element={<UserProfiles />} />
-                <Route path="/calendar" element={<Calendar />} />
                 <Route path="/blank" element={<Blank />} />
                 <Route path="/form-elements" element={<FormElements />} />
                 <Route path="/basic-tables" element={<BasicTables />} />

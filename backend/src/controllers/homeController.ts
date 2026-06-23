@@ -67,6 +67,20 @@ export class HomeController {
             res.status(500).json({ success: false, message: 'Error al obtener fraternidades' });
         }
     }
+
+    static async findForCommunicationUser(req: AuthRequest, res: Response) {
+        try {
+            const brotherId = req.user?.id_brother;
+            if (!brotherId) {
+                return res.json({ success: true, data: [], count: 0 });
+            }
+            const homes = await HomeModel.findByCommunicationBrother(Number(brotherId));
+            res.json({ success: true, data: homes, count: homes.length });
+        } catch (error: any) {
+            console.error('❌ Error en HomeController.findForCommunicationUser:', error.message);
+            res.status(500).json({ success: false, message: 'Error al obtener fraternidades' });
+        }
+    }
     
     static async getById(req: AuthRequest, res: Response) {
         try {

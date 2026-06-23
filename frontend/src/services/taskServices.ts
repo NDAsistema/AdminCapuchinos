@@ -27,6 +27,7 @@ export interface Task {
   priority?: 'low' | 'medium' | 'high' | 'urgent';
   assigned_type?: number;
   assigned_ids?: number[];
+  assignments?: { assigned_type: number; assigned_id: number; assigned_name: string }[];
   due_date?: string | null;
   is_recurring?: boolean;
   recurrence_rule?: string | null;
@@ -68,6 +69,11 @@ class TaskService {
 
   async createTask(taskData: Partial<Task>): Promise<any> {
     const response = await api.post('/tasks', taskData);
+    return response.data;
+  }
+
+  async updateTask(id: number, taskData: Partial<Task>): Promise<any> {
+    const response = await api.put(`/tasks/${id}`, taskData);
     return response.data;
   }
 
