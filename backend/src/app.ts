@@ -15,6 +15,7 @@ import taskRoutes from './routes/taskRoutes';
 import notificationRoutes from './routes/notificationRoutes';
 import calendarRoutes from './routes/calendarRoutes';
 import eventRoutes from './routes/eventRoutes';
+import saintRoutes from './routes/saintRoutes';
 import { authMiddleware } from './middleware/authMiddleware';
 import { EventReminderService } from './services/EventReminderService';
 
@@ -49,6 +50,7 @@ app.use('/api/tasks', authMiddleware, taskRoutes);
 app.use('/api/notifications', authMiddleware, notificationRoutes);
 app.use('/api/calendars', authMiddleware, calendarRoutes);
 app.use('/api/events', authMiddleware, eventRoutes);
+app.use('/api/saints', authMiddleware, saintRoutes);
 //app.use('/api/group', authMiddleware, groupRoutes);
 
 // Ruta de prueba de base de datos
