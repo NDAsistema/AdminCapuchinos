@@ -1,13 +1,22 @@
-import React, { createContext, useContext, useState, useEffect } from "react";
+import React, { createContext, useContext, useState, useEffect, useCallback } from "react";
 
 interface AuthContextType {
   user: any;
   login: (userData: any, token: string) => void;
   logout: () => void;
+  updateUser: (userData: Partial<any>) => void;
   loading: boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
+
+function normalizeUser(userData: any) {
+  return {
+    ...userData,
+    type_user: Number(userData.type_user),
+    is_group_leader: Boolean(userData.is_group_leader),
+  };
+}
 
 export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [user, setUser] = useState<any>(null);
@@ -19,12 +28,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         const savedUser = localStorage.getItem("user");
         const token = localStorage.getItem("token");
         if (savedUser && token && savedUser !== "undefined") {
-          const parsed = JSON.parse(savedUser);
-          setUser({
-            ...parsed,
-            type_user: Number(parsed.type_user),
-            is_group_leader: Boolean(parsed.is_group_leader),
-          });
+          setUser(normalizeUser(JSON.parse(savedUser)));
         }
       } catch (e) {
         console.error("Error cargando sesión", e);
@@ -36,15 +40,20 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   }, []);
 
   const login = (userData: any, token: string) => {
-    const normalized = {
-      ...userData,
-      type_user: Number(userData.type_user),
-      is_group_leader: Boolean(userData.is_group_leader),
-    };
+    const normalized = normalizeUser(userData);
     localStorage.setItem("token", token);
     localStorage.setItem("user", JSON.stringify(normalized));
     setUser(normalized);
   };
+
+  const updateUser = useCallback((userData: Partial<any>) => {
+    setUser((prev: any) => {
+      if (!prev) return prev;
+      const next = normalizeUser({ ...prev, ...userData });
+      localStorage.setItem("user", JSON.stringify(next));
+      return next;
+    });
+  }, []);
 
   const logout = () => {
     localStorage.removeItem("token");
@@ -54,7 +63,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   };
 
   return (
-    <AuthContext.Provider value={{ user, login, logout, loading }}>
+    <AuthContext.Provider value={{ user, login, logout, updateUser, loading }}>
       {!loading && children}
     </AuthContext.Provider>
   );
