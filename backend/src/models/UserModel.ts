@@ -18,6 +18,11 @@ export interface User {
   updated_at: Date;
   name_brother: string;
   img_brother: string;
+  study?: string;
+  cv?: string;
+  birth_date?: string | null;
+  year_profession?: string | null;
+  brother_email?: string;
 }
 
 export class UserModel {
@@ -105,7 +110,12 @@ export class UserModel {
   static async findById(id: number): Promise<User | null> {
     try {
       const [rows] = await pool.execute(
-        'SELECT id, id_brother, type_user, status, email, created_at FROM users WHERE id = ?',
+        `SELECT u.id, u.id_brother, u.type_user, u.status, u.email, u.password, u.created_at,
+                b.name as name_brother, b.img as img_brother,
+                b.study, b.cv, b.birth_date, b.year_profession, b.email as brother_email
+         FROM users u
+         LEFT JOIN brothers b ON b.id = u.id_brother
+         WHERE u.id = ? AND u.status = 1`,
         [id]
       );
       
@@ -115,6 +125,36 @@ export class UserModel {
       console.error('Error finding user by id:', error);
       throw error;
     }
+  }
+
+  static async updateEmail(id: number, email: string): Promise<void> {
+    const [result] = await pool.execute(
+      'UPDATE users SET email = ?, updated_at = NOW() WHERE id = ? AND status = 1',
+      [email.trim().toLowerCase(), id]
+    );
+    const affectedRows = (result as { affectedRows?: number }).affectedRows ?? 0;
+    if (affectedRows === 0) {
+      throw new Error('Usuario no encontrado o inactivo');
+    }
+  }
+
+  static async updatePassword(id: number, hashedPassword: string): Promise<void> {
+    const [result] = await pool.execute(
+      'UPDATE users SET password = ?, updated_at = NOW() WHERE id = ? AND status = 1',
+      [hashedPassword, id]
+    );
+    const affectedRows = (result as { affectedRows?: number }).affectedRows ?? 0;
+    if (affectedRows === 0) {
+      throw new Error('Usuario no encontrado o inactivo');
+    }
+  }
+
+  static async emailExistsForOtherUser(email: string, excludeUserId: number): Promise<boolean> {
+    const [rows] = await pool.execute(
+      'SELECT id FROM users WHERE LOWER(TRIM(email)) = ? AND id != ? AND status = 1 LIMIT 1',
+      [email.trim().toLowerCase(), excludeUserId]
+    );
+    return (rows as any[]).length > 0;
   }
 
   static async findListUsersType(type_user: number): Promise<User[]> {

@@ -1,75 +1,195 @@
+import { useEffect, useMemo, useState } from "react";
+import FroalaEditorComponent from "react-froala-wysiwyg";
+import "froala-editor/css/froala_editor.pkgd.min.css";
+import "froala-editor/css/froala_style.min.css";
+import "froala-editor/js/plugins.pkgd.min.js";
+import "froala-editor/js/plugins/colors.min.js";
+import "froala-editor/js/plugins/link.min.js";
+import "froala-editor/js/plugins/font_family.min.js";
+import "froala-editor/js/plugins/font_size.min.js";
+import "froala-editor/js/plugins/lists.min.js";
+import "froala-editor/js/plugins/paragraph_format.min.js";
+import "froala-editor/js/plugins/align.min.js";
+import "froala-editor/js/plugins/char_counter.min.js";
+import "froala-editor/js/plugins/table.min.js";
+import "froala-editor/js/plugins/image.min.js";
+import "froala-editor/js/plugins/video.min.js";
+import "froala-editor/js/plugins/emoticons.min.js";
+import "froala-editor/js/plugins/fullscreen.min.js";
+import "froala-editor/js/languages/es.js";
 import { useModal } from "../../hooks/useModal";
 import { Modal } from "../ui/modal";
 import Button from "../ui/button/Button";
 import Input from "../form/input/InputField";
 import Label from "../form/Label";
+import { useAuth } from "./AuthProvider";
+import authService from "../../services/authService";
+import AlertService from "../../services/alertService";
+import { getFroalaEditorConfig } from "../../config/froalaEditorConfig";
+
+function formatDate(value?: string | null) {
+  if (!value) return "";
+  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) return value;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  return date.toISOString().split("T")[0];
+}
+
+function displayDate(value?: string | null) {
+  const formatted = formatDate(value);
+  if (!formatted) return "—";
+  const [y, m, d] = formatted.split("-");
+  return `${d}/${m}/${y}`;
+}
+
+function hasCvContent(cv?: string | null) {
+  if (!cv) return false;
+  const text = cv.replace(/<[^>]*>/g, "").replace(/&nbsp;/g, " ").trim();
+  return text.length > 0;
+}
 
 export default function UserInfoCard() {
+  const { user, updateUser } = useAuth();
   const { isOpen, openModal, closeModal } = useModal();
-  const handleSave = () => {
-    // Handle save logic here
-    console.log("Saving changes...");
-    closeModal();
+  const [saving, setSaving] = useState(false);
+  const [editorKey, setEditorKey] = useState(0);
+  const [form, setForm] = useState({
+    name: "",
+    email: "",
+    study: "",
+    cv: "",
+    birth_date: "",
+    year_profession: "",
+  });
+
+  const froalaConfig = useMemo(
+    () => getFroalaEditorConfig("Escriba su curriculum vitae aquí..."),
+    []
+  );
+
+  useEffect(() => {
+    if (!user) return;
+    setForm({
+      name: user.name_brother || "",
+      email: user.email || "",
+      study: user.study || "",
+      cv: user.cv || "",
+      birth_date: formatDate(user.birth_date),
+      year_profession: formatDate(user.year_profession),
+    });
+    if (isOpen) setEditorKey((k) => k + 1);
+  }, [user, isOpen]);
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = e.target;
+    setForm((prev) => ({ ...prev, [name]: value }));
   };
+
+  const handleSave = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!form.name.trim() || !form.email.trim()) {
+      AlertService.warning("Campos requeridos", "Nombre y email son obligatorios");
+      return;
+    }
+
+    try {
+      setSaving(true);
+      AlertService.loading("Guardando...");
+      const updated = await authService.updateProfile({
+        name: form.name.trim(),
+        email: form.email.trim(),
+        study: form.study,
+        cv: form.cv,
+        birth_date: form.birth_date || null,
+        year_profession: form.year_profession || null,
+      });
+      updateUser(updated);
+      AlertService.close();
+      closeModal();
+      await AlertService.success("Listo", "Tus datos personales se actualizaron");
+    } catch (error: any) {
+      AlertService.close();
+      AlertService.error("Error", error.message || "No se pudieron guardar los datos");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (!user) return null;
+
   return (
     <div className="p-5 border border-gray-200 rounded-2xl dark:border-gray-800 lg:p-6">
       <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
-        <div>
+        <div className="w-full">
           <h4 className="text-lg font-semibold text-gray-800 dark:text-white/90 lg:mb-6">
-            Personal Information
+            Información personal
           </h4>
 
           <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 lg:gap-7 2xl:gap-x-32">
             <div>
               <p className="mb-2 text-xs leading-normal text-gray-500 dark:text-gray-400">
-                First Name
+                Nombre
               </p>
               <p className="text-sm font-medium text-gray-800 dark:text-white/90">
-                Musharof
+                {user.name_brother || "—"}
               </p>
             </div>
 
             <div>
               <p className="mb-2 text-xs leading-normal text-gray-500 dark:text-gray-400">
-                Last Name
+                Email
               </p>
               <p className="text-sm font-medium text-gray-800 dark:text-white/90">
-                Chowdhury
+                {user.email || "—"}
               </p>
             </div>
 
             <div>
               <p className="mb-2 text-xs leading-normal text-gray-500 dark:text-gray-400">
-                Email address
+                Estudios
               </p>
               <p className="text-sm font-medium text-gray-800 dark:text-white/90">
-                randomuser@pimjo.com
+                {user.study || "—"}
               </p>
             </div>
 
             <div>
               <p className="mb-2 text-xs leading-normal text-gray-500 dark:text-gray-400">
-                Phone
+                Fecha de nacimiento
               </p>
               <p className="text-sm font-medium text-gray-800 dark:text-white/90">
-                +09 363 398 46
+                {displayDate(user.birth_date)}
               </p>
             </div>
 
             <div>
               <p className="mb-2 text-xs leading-normal text-gray-500 dark:text-gray-400">
-                Bio
+                Año de profesión
               </p>
               <p className="text-sm font-medium text-gray-800 dark:text-white/90">
-                Team Manager
+                {displayDate(user.year_profession)}
               </p>
             </div>
+          </div>
+
+          <div className="mt-6">
+            <p className="mb-2 text-xs leading-normal text-gray-500 dark:text-gray-400">
+              CV / Notas
+            </p>
+            {hasCvContent(user.cv) ? (
+              <div
+                className="fr-view text-sm text-gray-800 dark:text-white/90 prose prose-sm max-w-none"
+                dangerouslySetInnerHTML={{ __html: user.cv || "" }}
+              />
+            ) : (
+              <p className="text-sm font-medium text-gray-800 dark:text-white/90">—</p>
+            )}
           </div>
         </div>
 
         <button
           onClick={openModal}
-          className="flex w-full items-center justify-center gap-2 rounded-full border border-gray-300 bg-white px-4 py-3 text-sm font-medium text-gray-700 shadow-theme-xs hover:bg-gray-50 hover:text-gray-800 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-white/[0.03] dark:hover:text-gray-200 lg:inline-flex lg:w-auto"
+          className="flex w-full items-center justify-center gap-2 rounded-full border border-gray-300 bg-white px-4 py-3 text-sm font-medium text-gray-700 shadow-theme-xs hover:bg-gray-50 hover:text-gray-800 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-white/[0.03] dark:hover:text-gray-200 lg:inline-flex lg:w-auto shrink-0"
         >
           <svg
             className="fill-current"
@@ -86,7 +206,7 @@ export default function UserInfoCard() {
               fill=""
             />
           </svg>
-          Edit
+          Editar
         </button>
       </div>
 
@@ -94,86 +214,87 @@ export default function UserInfoCard() {
         <div className="no-scrollbar relative w-full max-w-[700px] overflow-y-auto rounded-3xl bg-white p-4 dark:bg-gray-900 lg:p-11">
           <div className="px-2 pr-14">
             <h4 className="mb-2 text-2xl font-semibold text-gray-800 dark:text-white/90">
-              Edit Personal Information
+              Editar información personal
             </h4>
             <p className="mb-6 text-sm text-gray-500 dark:text-gray-400 lg:mb-7">
-              Update your details to keep your profile up-to-date.
+              Solo puedes actualizar tus datos personales.
             </p>
           </div>
-          <form className="flex flex-col">
-            <div className="custom-scrollbar h-[450px] overflow-y-auto px-2 pb-3">
-              <div>
-                <h5 className="mb-5 text-lg font-medium text-gray-800 dark:text-white/90 lg:mb-6">
-                  Social Links
-                </h5>
-
-                <div className="grid grid-cols-1 gap-x-6 gap-y-5 lg:grid-cols-2">
-                  <div>
-                    <Label>Facebook</Label>
-                    <Input
-                      type="text"
-                      value="https://www.facebook.com/PimjoHQ"
-                    />
-                  </div>
-
-                  <div>
-                    <Label>X.com</Label>
-                    <Input type="text" value="https://x.com/PimjoHQ" />
-                  </div>
-
-                  <div>
-                    <Label>Linkedin</Label>
-                    <Input
-                      type="text"
-                      value="https://www.linkedin.com/company/pimjo"
-                    />
-                  </div>
-
-                  <div>
-                    <Label>Instagram</Label>
-                    <Input type="text" value="https://instagram.com/PimjoHQ" />
-                  </div>
+          <form className="flex flex-col" onSubmit={handleSave}>
+            <div className="px-2 pb-3 overflow-y-auto custom-scrollbar max-h-[60vh]">
+              <div className="grid grid-cols-1 gap-x-6 gap-y-5 lg:grid-cols-2">
+                <div className="col-span-2 lg:col-span-1">
+                  <Label>Nombre</Label>
+                  <Input
+                    type="text"
+                    name="name"
+                    value={form.name}
+                    onChange={handleChange}
+                  />
                 </div>
-              </div>
-              <div className="mt-7">
-                <h5 className="mb-5 text-lg font-medium text-gray-800 dark:text-white/90 lg:mb-6">
-                  Personal Information
-                </h5>
 
-                <div className="grid grid-cols-1 gap-x-6 gap-y-5 lg:grid-cols-2">
-                  <div className="col-span-2 lg:col-span-1">
-                    <Label>First Name</Label>
-                    <Input type="text" value="Musharof" />
-                  </div>
+                <div className="col-span-2 lg:col-span-1">
+                  <Label>Email</Label>
+                  <Input
+                    type="email"
+                    name="email"
+                    value={form.email}
+                    onChange={handleChange}
+                  />
+                </div>
 
-                  <div className="col-span-2 lg:col-span-1">
-                    <Label>Last Name</Label>
-                    <Input type="text" value="Chowdhury" />
-                  </div>
+                <div className="col-span-2 lg:col-span-1">
+                  <Label>Estudios</Label>
+                  <Input
+                    type="text"
+                    name="study"
+                    value={form.study}
+                    onChange={handleChange}
+                  />
+                </div>
 
-                  <div className="col-span-2 lg:col-span-1">
-                    <Label>Email Address</Label>
-                    <Input type="text" value="randomuser@pimjo.com" />
-                  </div>
+                <div className="col-span-2 lg:col-span-1">
+                  <Label>Fecha de nacimiento</Label>
+                  <Input
+                    type="date"
+                    name="birth_date"
+                    value={form.birth_date}
+                    onChange={handleChange}
+                  />
+                </div>
 
-                  <div className="col-span-2 lg:col-span-1">
-                    <Label>Phone</Label>
-                    <Input type="text" value="+09 363 398 46" />
-                  </div>
+                <div className="col-span-2 lg:col-span-1">
+                  <Label>Año de profesión</Label>
+                  <Input
+                    type="date"
+                    name="year_profession"
+                    value={form.year_profession}
+                    onChange={handleChange}
+                  />
+                </div>
 
-                  <div className="col-span-2">
-                    <Label>Bio</Label>
-                    <Input type="text" value="Team Manager" />
+                <div className="col-span-2">
+                  <Label>CV / Notas</Label>
+                  <div className="overflow-hidden border border-gray-300 rounded-lg dark:border-gray-600">
+                    <FroalaEditorComponent
+                      key={editorKey}
+                      tag="textarea"
+                      model={form.cv}
+                      onModelChange={(content: string) =>
+                        setForm((prev) => ({ ...prev, cv: content }))
+                      }
+                      config={froalaConfig}
+                    />
                   </div>
                 </div>
               </div>
             </div>
             <div className="flex items-center gap-3 px-2 mt-6 lg:justify-end">
-              <Button size="sm" variant="outline" onClick={closeModal}>
-                Close
+              <Button size="sm" variant="outline" type="button" onClick={closeModal} disabled={saving}>
+                Cancelar
               </Button>
-              <Button size="sm" onClick={handleSave}>
-                Save Changes
+              <Button size="sm" type="submit" disabled={saving}>
+                {saving ? "Guardando..." : "Guardar cambios"}
               </Button>
             </div>
           </form>
