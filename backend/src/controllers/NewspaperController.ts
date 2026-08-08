@@ -109,4 +109,19 @@ export class NewspaperController {
             res.status(500).json({ success: false, message: 'Error interno al actualizar' });
         }
     }
+
+    static async delete(req: AuthRequest, res: Response) {
+        try {
+            const { id } = req.params;
+            const created_by = AuthController.getUserId(req); 
+            const deleted = await NewspaperModel.delete(parseInt(id), created_by);
+            if (!deleted) {
+                return res.status(404).json({ success: false, message: 'Noticia no encontrada' });
+            }
+            return res.json({ success: true, message: 'Noticia eliminada correctamente' });
+        } catch (error: any) {
+            console.error('❌ Error en delete news:', error.message);
+            res.status(500).json({ success: false, message: 'Error interno al eliminar' });
+        }
+    }
 }

@@ -65,8 +65,8 @@ export class NewspaperModel {
         return result.affectedRows > 0;
     }
 
-    static async delete(id: number): Promise<boolean> {
-        const [result] = await pool.execute('DELETE FROM newspaper WHERE id = ?', [id]) as any;
+    static async delete(id: number, created_by: number): Promise<boolean> {
+        const [result] = await pool.execute('UPDATE newspapers SET status = 0, updated_at = NOW(), created_by = ? WHERE id = ?', [created_by, id]) as any;
         return result.affectedRows > 0;
     }
 }
