@@ -1,9 +1,10 @@
 import { pool } from '../config/database';
-
+import { slugify, uniqueSlug } from '../utils/slugify';
 
 export interface Newspaper {
     id: number;
     title: string;
+    slug: string;
     content: string;
     img?: string | null;
     type_news: number;
@@ -44,14 +45,70 @@ export class NewspaperModel {
         return rows[0] || null;
     }
 
-    static async create(newspaperData: Omit<Newspaper, 'id' | 'created_at' | 'updated_at'>): Promise<Newspaper> {
-        const { title, content, img, type_news, type_assing, sub_type_assing, status, created_by } = newspaperData;
-        const [result] = await pool.execute(
-            'INSERT INTO newspapers (title, content, img, type_news, type_assing, sub_type_assing, status, created_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-            [title, content, img, type_news, type_assing, sub_type_assing, status, created_by]
+    static async findBySlug(slug: string): Promise<Newspaper | null> {
+        const [rows] = await pool.execute(
+            'SELECT * FROM newspapers WHERE slug = ? AND status = 1 LIMIT 1',
+            [slug]
         ) as any;
-        
-        return { id: result.insertId, ...newspaperData };
+        return rows[0] || null;
+    }
+
+    /** true si el slug ya está tomado (opcionalmente excluyendo un id al editar) */
+    static async slugExists(slug: string, excludeId?: number): Promise<boolean> {
+        if (excludeId != null) {
+            const [rows] = await pool.execute(
+                'SELECT id FROM newspapers WHERE slug = ? AND id != ? LIMIT 1',
+                [slug, excludeId]
+            ) as any;
+            return rows.length > 0;
+        }
+        const [rows] = await pool.execute(
+            'SELECT id FROM newspapers WHERE slug = ? LIMIT 1',
+            [slug]
+        ) as any;
+        return rows.length > 0;
+    }
+
+    /**
+     * Genera un slug único a partir del título (o de un slug propuesto).
+     */
+    static async generateUniqueSlug(
+        titleOrSlug: string,
+        excludeId?: number,
+        alreadySlugified = false
+    ): Promise<string> {
+        const base = alreadySlugified ? (titleOrSlug || 'noticia') : slugify(titleOrSlug);
+        return uniqueSlug(base, (candidate) => this.slugExists(candidate, excludeId));
+    }
+
+    static async create(
+        newspaperData: Omit<Newspaper, 'id' | 'created_at' | 'updated_at' | 'slug'> & { slug?: string }
+    ): Promise<Newspaper> {
+        const { title, content, img, type_news, type_assing, sub_type_assing, status, created_by } = newspaperData;
+
+        const slug = newspaperData.slug
+            ? await this.generateUniqueSlug(newspaperData.slug, undefined, true)
+            : await this.generateUniqueSlug(title);
+
+        const [result] = await pool.execute(
+            `INSERT INTO newspapers
+                (title, slug, content, img, type_news, type_assing, sub_type_assing, status, created_by)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            [title, slug, content, img, type_news, type_assing, sub_type_assing, status, created_by]
+        ) as any;
+
+        return {
+            id: result.insertId,
+            title,
+            slug,
+            content,
+            img,
+            type_news,
+            type_assing,
+            sub_type_assing,
+            status,
+            created_by,
+        };
     }
 
     static async update(id: number, data: Partial<Newspaper>): Promise<boolean> {
@@ -66,7 +123,7 @@ export class NewspaperModel {
     }
 
     static async delete(id: number): Promise<boolean> {
-        const [result] = await pool.execute('DELETE FROM newspaper WHERE id = ?', [id]) as any;
+        const [result] = await pool.execute('DELETE FROM newspapers WHERE id = ?', [id]) as any;
         return result.affectedRows > 0;
     }
 }

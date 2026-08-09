@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "nodemon src/app.ts",
     "build": "tsc",
-    "start": "node dist/app.js"
+    "start": "node dist/app.js",
+    "backfill:newspaper-slugs": "ts-node src/scripts/backfillNewspaperSlugs.ts"
   },
   "keywords": [],
   "author": "",

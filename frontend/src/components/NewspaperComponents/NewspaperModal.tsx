@@ -7,6 +7,7 @@ import FroalaEditorComponent from 'react-froala-wysiwyg';
 import NewspaperService from '../../services/newspaperServices';
 import { API_URL } from '../../config/env';
 import HomeService from '../../services/homeService';
+import { slugify } from '../../utils/slugify';
 
 interface Props {
     isOpen: boolean;
@@ -17,6 +18,9 @@ interface Props {
 
 export const NewspaperModal: React.FC<Props> = ({ isOpen, onClose, onSuccess, initialData }) => {
     const [title, setTitle] = useState('');
+    const [slug, setSlug] = useState('');
+    const [slugManual, setSlugManual] = useState(false);
+    const [updateSlugOnSave, setUpdateSlugOnSave] = useState(true);
     const [content, setContent] = useState('');
     const [typeNews, setTypeNews] = useState('0');
     const [typeAssing, setTypeAssing] = useState('0');
@@ -57,17 +61,41 @@ export const NewspaperModal: React.FC<Props> = ({ isOpen, onClose, onSuccess, in
     useEffect(() => {
         if (isOpen && initialData) {
             setTitle(initialData.title || '');
+            setSlug(initialData.slug || slugify(initialData.title || ''));
+            setSlugManual(false);
+            setUpdateSlugOnSave(false);
             setContent(initialData.content || '');
             setTypeNews(String(initialData.type_news || '0'));
             setTypeAssing(String(initialData.type_assing || '0'));
             setIdAssing(String(initialData.sub_type_assing || '0'));
             setImage(null); 
+        } else if (isOpen && !initialData) {
+            setTitle(''); setSlug(''); setSlugManual(false);
+            setUpdateSlugOnSave(true); setContent(''); setTypeAssing('0');
+            setIdAssing('0'); setImage(null); setOptions([]);
+            setErrors([]); setTouched(false);
         } else if (!isOpen) {
-            setTitle(''); setContent(''); setTypeAssing('0'); 
+            setTitle(''); setSlug(''); setSlugManual(false);
+            setUpdateSlugOnSave(true); setContent(''); setTypeAssing('0');
             setIdAssing('0'); setImage(null); setOptions([]);
             setErrors([]); setTouched(false);
         }
     }, [isOpen, initialData]);
+
+    const handleTitleChange = (value: string) => {
+        setTitle(value);
+        if (!isEdit) {
+            if (!slugManual) setSlug(slugify(value));
+        } else if (updateSlugOnSave && !slugManual) {
+            setSlug(slugify(value));
+        }
+    };
+
+    const handleSlugChange = (value: string) => {
+        setSlugManual(true);
+        setSlug(slugify(value));
+        if (isEdit) setUpdateSlugOnSave(true);
+    };
 
     useEffect(() => {
         if (typeAssing === '1') {
@@ -100,6 +128,10 @@ export const NewspaperModal: React.FC<Props> = ({ isOpen, onClose, onSuccess, in
         formData.append('type_news', typeNews);
         formData.append('type_assing', typeAssing);
         formData.append('idAssing', idAssing);
+        formData.append('slug', slug || slugify(title));
+        if (isEdit) {
+            formData.append('update_slug', updateSlugOnSave ? 'true' : 'false');
+        }
         
         // Solo adjuntamos imagen si el usuario seleccionó una nueva
         if (image) {
@@ -155,8 +187,43 @@ export const NewspaperModal: React.FC<Props> = ({ isOpen, onClose, onSuccess, in
                         <input 
                             className={`w-full p-2 border rounded-lg outline-none ${touched && !title ? 'border-red-500 bg-red-50' : 'dark:bg-gray-700 dark:border-gray-600'}`} 
                             value={title} 
-                            onChange={e => setTitle(e.target.value)} 
+                            onChange={e => handleTitleChange(e.target.value)} 
                         />
+                    </div>
+
+                    {/* Slug SEO */}
+                    <div>
+                        <div className="flex items-center justify-between mb-1">
+                            <label className="block text-sm font-medium dark:text-gray-200">
+                                Slug (URL amigable)
+                            </label>
+                            {isEdit && (
+                                <label className="flex items-center gap-2 text-xs text-gray-500 cursor-pointer">
+                                    <input
+                                        type="checkbox"
+                                        checked={updateSlugOnSave}
+                                        onChange={(e) => {
+                                            setUpdateSlugOnSave(e.target.checked);
+                                            if (e.target.checked) {
+                                                setSlugManual(false);
+                                                setSlug(slugify(title));
+                                            }
+                                        }}
+                                    />
+                                    Actualizar slug al guardar
+                                </label>
+                            )}
+                        </div>
+                        <input
+                            className="w-full p-2 border rounded-lg outline-none font-mono text-sm dark:bg-gray-700 dark:border-gray-600 dark:text-gray-200"
+                            value={slug}
+                            onChange={(e) => handleSlugChange(e.target.value)}
+                            placeholder="se-genera-desde-el-titulo"
+                            disabled={isEdit && !updateSlugOnSave}
+                        />
+                        <p className="mt-1 text-xs text-gray-400">
+                            Ruta: <span className="font-mono text-blue-600">/noticias/{slug || '…'}</span>
+                        </p>
                     </div>
                     
                     {/* Contenido Froala */}

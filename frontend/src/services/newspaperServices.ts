@@ -32,6 +32,7 @@ api.interceptors.response.use(
 export interface Newspaper {
     id?: number;
     title: string;
+    slug: string;
     content: string;
     img?: string | null;
     type_news: number;
@@ -40,6 +41,8 @@ export interface Newspaper {
     status: number;
     created_at?: string;
     updated_at?: string;
+    name_created_by?: string;
+    assigned_to_name?: string;
 }
 
 class NewspaperService {
@@ -51,6 +54,16 @@ class NewspaperService {
         } catch (error: any) {
             console.error('❌ Error obteniendo periódicos:', error.message);
             return [];
+        }
+    }
+
+    async getNewspaperBySlug(slug: string): Promise<Newspaper | null> {
+        try {
+            const response = await api.get(`/newspaper/slug/${encodeURIComponent(slug)}`);
+            return response.data.success ? response.data.data : null;
+        } catch (error: any) {
+            console.error('❌ Error obteniendo noticia por slug:', error.message);
+            return null;
         }
     }
 

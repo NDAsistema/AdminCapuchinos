@@ -4,10 +4,10 @@ import { NewspaperModel } from '../models/NewspaperModel';
 import { AttachmentController } from './AttachmentController'; 
 import AWSS3Service from '../services/awsS3Service';
 import { AuthController } from './authController';
+import { slugify } from '../utils/slugify';
 
 export class NewspaperController {
 
-    // Asegúrate de que se llame findAll y sea static
     static async findAll(req: AuthRequest, res: Response) {
         try {
             const newspapers = await NewspaperModel.findAll();
@@ -18,9 +18,28 @@ export class NewspaperController {
         }
     }
 
+    static async findBySlug(req: AuthRequest, res: Response) {
+        try {
+            const { slug } = req.params;
+            if (!slug?.trim()) {
+                return res.status(400).json({ success: false, message: 'Slug requerido' });
+            }
+
+            const newspaper = await NewspaperModel.findBySlug(slug);
+            if (!newspaper) {
+                return res.status(404).json({ success: false, message: 'Noticia no encontrada' });
+            }
+
+            return res.json({ success: true, data: newspaper });
+        } catch (error: any) {
+            console.error('❌ Error en findBySlug:', error.message);
+            return res.status(500).json({ success: false, message: 'Error al obtener noticia' });
+        }
+    }
+
     static async create(req: AuthRequest, res: Response) {
         try {
-            const { title, content, type_news, type_assing, idAssing } = req.body;
+            const { title, content, type_news, type_assing, idAssing, slug: slugFromBody } = req.body;
             const file = req.file; 
             
             const created_by = AuthController.getUserId(req); 
@@ -31,8 +50,10 @@ export class NewspaperController {
                 imageUrl = await AWSS3Service.uploadNewspapersImage(file);
             }
 
+            // Slug opcional desde el admin; si no viene, se genera desde el título
             const newNews = await NewspaperModel.create({
                 title,
+                slug: slugFromBody?.trim() ? slugify(slugFromBody) : undefined,
                 content,
                 img: imageUrl,
                 type_news: parseInt(type_news),
@@ -57,16 +78,16 @@ export class NewspaperController {
     static async update(req: AuthRequest, res: Response) {
         try {
             const { id } = req.params;
-            const { title, content, type_news, type_assing, idAssing } = req.body;
+            const { title, content, type_news, type_assing, idAssing, slug: slugFromBody, update_slug } = req.body;
             const file = req.file;
+            const newsId = parseInt(id);
 
-            // 1. Buscar la noticia actual para saber si tiene una imagen previa
-            const existingNews = await NewspaperModel.findById(parseInt(id));
+            const existingNews = await NewspaperModel.findById(newsId);
             if (!existingNews) {
                 return res.status(404).json({ success: false, message: 'Noticia no encontrada' });
             }
 
-            let imageUrl = existingNews.img; // Por defecto mantenemos la actual
+            let imageUrl = existingNews.img;
 
             if (file) {
                 try {
@@ -85,23 +106,45 @@ export class NewspaperController {
                 }
             }
 
-            const updated = await NewspaperModel.update(parseInt(id), {
+            const payload: Record<string, unknown> = {
                 title,
                 content,
                 img: imageUrl,
                 type_news: parseInt(type_news),
                 type_assing: parseInt(type_assing),
                 sub_type_assing: parseInt(idAssing)
-            });
+            };
+
+            // Regenerar slug si:
+            // - update_slug === 'true' / true, o
+            // - se envía un slug distinto, o
+            // - el título cambió y no se pide mantener el slug (por defecto se regenera si cambió el título)
+            const shouldUpdateSlug =
+                update_slug === true ||
+                update_slug === 'true' ||
+                (typeof slugFromBody === 'string' && slugFromBody.trim() !== '' && slugify(slugFromBody) !== existingNews.slug) ||
+                (title !== existingNews.title && update_slug !== false && update_slug !== 'false');
+
+            let nextSlug = existingNews.slug;
+
+            if (shouldUpdateSlug) {
+                const base = (typeof slugFromBody === 'string' && slugFromBody.trim())
+                    ? slugify(slugFromBody)
+                    : slugify(title);
+                nextSlug = await NewspaperModel.generateUniqueSlug(base, newsId, true);
+                payload.slug = nextSlug;
+            }
+
+            const updated = await NewspaperModel.update(newsId, payload as any);
 
             if (updated) {
-                await AttachmentController.extractAndBindImages(parseInt(id), content);
+                await AttachmentController.extractAndBindImages(newsId, content);
             }
 
             return res.json({
                 success: true,
                 message: 'Noticia actualizada correctamente',
-                data: { id, title, img: imageUrl }
+                data: { id: newsId, title, slug: nextSlug, img: imageUrl }
             });
 
         } catch (error: any) {
