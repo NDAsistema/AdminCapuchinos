@@ -13,9 +13,11 @@ export const NewspaperTable: React.FC<NewspaperTableProps> = ({ newspaper, onEdi
     const itemsPerPage = 10;
 
     const filteredNews = useMemo(() => {
+        const term = searchTerm.toLowerCase();
         return newspaper.filter(item => 
-            item.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            item.assigned_to_name?.toLowerCase().includes(searchTerm.toLowerCase())
+            item.title.toLowerCase().includes(term) ||
+            item.slug?.toLowerCase().includes(term) ||
+            item.assigned_to_name?.toLowerCase().includes(term)
         );
     }, [newspaper, searchTerm]);
 
@@ -64,6 +66,7 @@ export const NewspaperTable: React.FC<NewspaperTableProps> = ({ newspaper, onEdi
                     <thead>
                         <tr className="border-b border-gray-50">
                             <th className="px-8 py-5 text-left text-[11px] font-black text-gray-400 uppercase tracking-widest">Título</th>
+                            <th className="px-8 py-5 text-left text-[11px] font-black text-gray-400 uppercase tracking-widest">Slug</th>
                             <th className="px-8 py-5 text-left text-[11px] font-black text-gray-400 uppercase tracking-widest">Fecha</th>
                             <th className="px-8 py-5 text-left text-[11px] font-black text-gray-400 uppercase tracking-widest">Publicado Por</th>
                             <th className="px-8 py-5 text-left text-[11px] font-black text-gray-400 uppercase tracking-widest">Asignado a</th>
@@ -74,6 +77,9 @@ export const NewspaperTable: React.FC<NewspaperTableProps> = ({ newspaper, onEdi
                         {currentItems.map((item) => (
                             <tr key={item.id} className="hover:bg-gray-50/50 transition-colors">
                                 <td className="px-8 py-6 text-[13px] font-bold text-gray-700">{item.title}</td>
+                                <td className="px-8 py-6 text-[12px] font-mono text-blue-600/80">
+                                    {item.slug ? `/${item.slug}` : '—'}
+                                </td>
                                 <td className="px-8 py-6 text-[13px] text-gray-500">{formatDate(item.created_at)}</td>
                                 <td className="px-8 py-6 text-[13px] text-gray-500">{item.name_created_by || 'Admin'}</td>
                                 <td className="px-8 py-6">
