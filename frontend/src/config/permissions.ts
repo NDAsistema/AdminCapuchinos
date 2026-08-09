@@ -37,25 +37,6 @@ const BUSINESS_ROUTE_ACCESS: Record<string, readonly UserRoleId[]> = {
   [MODULE_PATHS.PROFILE]: [USER_ROLES.ADMIN, USER_ROLES.STANDARD, USER_ROLES.COMMUNICATIONS],
 };
 
-/** Rutas demo TailAdmin — solo administrador */
-const DEMO_ROUTE_PREFIXES = [
-  "/calendar",
-  "/blank",
-  "/form-elements",
-  "/basic-tables",
-  "/alerts",
-  "/avatars",
-  "/badge",
-  "/buttons",
-  "/images",
-  "/videos",
-  "/line-chart",
-  "/bar-chart",
-  "/error-404",
-  "/signin",
-  "/signup",
-] as const;
-
 export function normalizeUserRole(typeUser: unknown): UserRoleId | null {
   const role = Number(typeUser);
   if (role === USER_ROLES.ADMIN || role === USER_ROLES.STANDARD || role === USER_ROLES.COMMUNICATIONS) {
@@ -71,14 +52,9 @@ export function canAccessRoute(pathname: string, typeUser: unknown): boolean {
   if (role === USER_ROLES.ADMIN) return true;
 
   const path = pathname.split("?")[0] || "/";
-
   const businessRoles = BUSINESS_ROUTE_ACCESS[path];
   if (businessRoles) {
     return businessRoles.includes(role);
-  }
-
-  if (DEMO_ROUTE_PREFIXES.some((demoPath) => path === demoPath || path.startsWith(`${demoPath}/`))) {
-    return false;
   }
 
   return false;
