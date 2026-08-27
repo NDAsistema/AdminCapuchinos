@@ -7,6 +7,7 @@ import FroalaEditorComponent from 'react-froala-wysiwyg';
 import NewspaperService from '../../services/newspaperServices';
 import { API_URL } from '../../config/env';
 import HomeService from '../../services/homeService';
+import GroupService from '../../services/GroupService';
 import { slugify } from '../../utils/slugify';
 
 interface Props {
@@ -71,13 +72,13 @@ export const NewspaperModal: React.FC<Props> = ({ isOpen, onClose, onSuccess, in
             setImage(null); 
         } else if (isOpen && !initialData) {
             setTitle(''); setSlug(''); setSlugManual(false);
-            setUpdateSlugOnSave(true); setContent(''); setTypeAssing('0');
-            setIdAssing('0'); setImage(null); setOptions([]);
+            setUpdateSlugOnSave(true); setContent(''); setTypeNews('0');
+            setTypeAssing('0'); setIdAssing('0'); setImage(null); setOptions([]);
             setErrors([]); setTouched(false);
         } else if (!isOpen) {
             setTitle(''); setSlug(''); setSlugManual(false);
-            setUpdateSlugOnSave(true); setContent(''); setTypeAssing('0');
-            setIdAssing('0'); setImage(null); setOptions([]);
+            setUpdateSlugOnSave(true); setContent(''); setTypeNews('0');
+            setTypeAssing('0'); setIdAssing('0'); setImage(null); setOptions([]);
             setErrors([]); setTouched(false);
         }
     }, [isOpen, initialData]);
@@ -98,14 +99,61 @@ export const NewspaperModal: React.FC<Props> = ({ isOpen, onClose, onSuccess, in
     };
 
     useEffect(() => {
-        if (typeAssing === '1') {
-            HomeService.getAllHomes().then(res => {
-                const homes = Array.isArray(res) ? res : res.data;
-                setOptions(homes.map((h: any) => ({ id: h.id, name: h.name_home || h.name })));
-            });
-        } else {
-            setOptions([]);
-        }
+        let cancelled = false;
+
+        const loadOptions = async () => {
+            if (typeAssing === '1') {
+                try {
+                    const res = await HomeService.getAllHomes();
+                    const homes = Array.isArray(res) ? res : res.data;
+                    if (!cancelled) {
+                        setOptions(
+                            (homes || []).map((h: any) => ({
+                                id: h.id,
+                                name: h.name_home || h.name,
+                            }))
+                        );
+                    }
+                } catch (error) {
+                    console.error('Error cargando casas:', error);
+                    if (!cancelled) setOptions([]);
+                }
+                return;
+            }
+
+            if (typeAssing === '2') {
+                try {
+                    const res = await GroupService.getAll();
+                    let groups = res;
+                    if (Array.isArray(groups) && Array.isArray(groups[0])) {
+                        groups = groups[0];
+                    }
+                    if (!Array.isArray(groups)) groups = [];
+
+                    if (!cancelled) {
+                        setOptions(
+                            groups
+                                .filter((g: any) => g.status === undefined || g.status === 1 || g.status === true)
+                                .map((g: any) => ({
+                                    id: g.id,
+                                    name: g.name || g.name_group || `Grupo ${g.id}`,
+                                }))
+                        );
+                    }
+                } catch (error) {
+                    console.error('Error cargando grupos:', error);
+                    if (!cancelled) setOptions([]);
+                }
+                return;
+            }
+
+            if (!cancelled) setOptions([]);
+        };
+
+        loadOptions();
+        return () => {
+            cancelled = true;
+        };
     }, [typeAssing]);
 
     const validate = () => {
@@ -251,7 +299,15 @@ export const NewspaperModal: React.FC<Props> = ({ isOpen, onClose, onSuccess, in
                         </div>
                         <div>
                             <label className="block text-sm font-medium dark:text-gray-200 mb-1">Asignar a</label>
-                            <select className="w-full p-2 border rounded-lg dark:bg-gray-700" value={typeAssing} onChange={e => setTypeAssing(e.target.value)}>
+                            <select
+                                className="w-full p-2 border rounded-lg dark:bg-gray-700"
+                                value={typeAssing}
+                                onChange={e => {
+                                    setTypeAssing(e.target.value);
+                                    setIdAssing('0');
+                                    setOptions([]);
+                                }}
+                            >
                                 <option value="0">General (Todos)</option>
                                 <option value="1">Casa</option>
                                 <option value="2">Grupo</option>
